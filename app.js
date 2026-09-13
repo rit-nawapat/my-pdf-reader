@@ -1054,9 +1054,16 @@ function updateCurrentPageFromScroll() {
   }
 }
 
+let lastNavTime = 0;
+let jumpTimer = null;
+
 function scrollToPage(pageNum, smooth = true) {
   if (pageNum < 1) pageNum = 1;
   if (pageNum > totalPages) pageNum = totalPages;
+
+  const now = Date.now();
+  const isRapidNav = (now - lastNavTime < 450);
+  lastNavTime = now;
 
   currentPage = pageNum;
   pageNumberInput.value = currentPage;
@@ -1064,20 +1071,45 @@ function scrollToPage(pageNum, smooth = true) {
   updateScrubberVisuals(currentPage);
   updateActiveThumbnail(currentPage);
 
+  // 1. Keep capsule and bottom bar visible when user intentionally navigates
+  if (floatingCapsule) {
+    floatingCapsule.classList.remove('hidden');
+  }
+  if (bottomBar) {
+    bottomBar.classList.remove('hidden');
+    if (typeof scheduleScrubberAutoHide === 'function') {
+      scheduleScrubberAutoHide(3000);
+    }
+  }
+
+  // 2. Set jump lock so programmatic scroll down does NOT hide the capsule
+  isJumpingToPage = true;
+  clearTimeout(jumpTimer);
+
+  // 3. Immediately pre-render target page and neighbors for seamless, continuous reading
+  renderMainPage(pageNum);
+  if (pageNum < totalPages) renderMainPage(pageNum + 1);
+  if (pageNum > 1) renderMainPage(pageNum - 1);
+
   const targetEl = document.getElementById(`page-${pageNum}`);
   if (targetEl) {
     const containerRect = viewerContainer.getBoundingClientRect();
     const targetRect = targetEl.getBoundingClientRect();
-    const targetTop = viewerContainer.scrollTop + (targetRect.top - containerRect.top) - 8;
+    const topOffset = window.innerWidth <= 768 ? 58 : 68;
+    const targetTop = Math.max(0, viewerContainer.scrollTop + (targetRect.top - containerRect.top) - topOffset);
 
-    if (smooth) {
-      viewerContainer.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
-    } else {
-      viewerContainer.scrollTop = Math.max(0, targetTop);
-    }
+    // If clicking rapidly, jump directly without queuing slow animations
+    const scrollBehavior = (smooth && !isRapidNav) ? 'smooth' : 'auto';
+    viewerContainer.scrollTo({ top: targetTop, behavior: scrollBehavior });
   }
 
-  if (currentFileKey && !isJumpingToPage) {
+  const lockDuration = (smooth && !isRapidNav) ? 500 : 120;
+  jumpTimer = setTimeout(() => {
+    isJumpingToPage = false;
+    lastScrollTop = viewerContainer.scrollTop;
+  }, lockDuration);
+
+  if (currentFileKey) {
     localStorage.setItem(currentFileKey, currentPage.toString());
     saveRecentFile({
       id: currentFileKey,
