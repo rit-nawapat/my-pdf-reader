@@ -197,25 +197,15 @@
                 </div>
               </div>
 
-              <!-- Auth & Profile Container -->
-              <div class="auth-profile-wrap" id="authProfileWrap">
-                <!-- Guest State: Sign In Button -->
-                <button class="btn btn-secondary auth-btn" id="authActionBtn" title="เข้าสู่ระบบด้วย Google">
-                  <svg class="icon icon-google" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
-                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
-                    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.99 0 12s.45 3.83 1.25 5.42l4.03-3.15z"/>
-                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-                  </svg>
-                  <span class="auth-btn-text">เข้าสู่ระบบ</span>
-                </button>
-
-                <!-- Logged In State: Avatar Button (hidden initially) -->
-                <button class="btn btn-icon auth-avatar-btn" id="authProfileBtn" title="ดูโปรไฟล์ผู้ใช้" style="display: none;">
-                  <img src="" alt="User Avatar" class="user-avatar-img" id="userAvatarImg">
-                  <span class="avatar-status-badge"></span>
-                </button>
-              </div>
+              <!-- User Profile Button (Unified circular button matching Settings) -->
+              <button class="btn btn-icon library-profile-btn" id="authProfileBtn" title="โปรไฟล์ผู้ใช้ / เข้าสู่ระบบ">
+                <svg class="icon icon-user-guest" id="guestUserIcon" viewBox="0 0 24 24">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <img src="" alt="User Avatar" class="user-avatar-img" id="userAvatarImg" style="display: none;">
+                <span class="avatar-status-dot" id="avatarStatusDot" style="display: none;"></span>
+              </button>
 
               <!-- Settings Button -->
               <button class="btn btn-icon library-settings-btn" id="openSettingsBtn" title="ตั้งค่า Google Drive">
@@ -261,52 +251,78 @@
   <!-- Toast Notification -->
   <div class="toast" id="toast"></div>
 
-  <!-- User Profile Popover Modal (Glassmorphic) -->
+  <!-- User Profile Popover (Zen Minimalist Design) -->
   <div class="profile-backdrop" id="profileBackdrop" style="display: none;"></div>
   <div class="profile-popover" id="profilePopover" aria-hidden="true" style="display: none;">
-    <div class="profile-popover-header">
-      <div class="profile-avatar-wrap">
-        <img src="" alt="Avatar" class="profile-large-avatar" id="popoverAvatarImg">
-        <span class="avatar-status-badge large"></span>
-      </div>
-      <div class="profile-info-wrap">
-        <h3 class="profile-name" id="popoverUserName">ผู้ใช้ Google</h3>
-        <p class="profile-email" id="popoverUserEmail">user@gmail.com</p>
-      </div>
-      <button type="button" class="btn btn-icon profile-close-btn" id="closeProfilePopoverBtn" title="ปิดหน้าต่างโปรไฟล์">
-        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
-    </div>
-
-    <div class="profile-popover-body">
-      <!-- Session Security Status -->
-      <div class="session-status-card">
-        <div class="session-status-badge" id="sessionStatusBadge">
-          <span class="session-dot"></span>
-          <span id="sessionStatusText">เซสชันปลอดภัย (Active)</span>
+    
+    <!-- View A: Logged-in User -->
+    <div class="popover-view" id="popoverLoggedInView" style="display: none;">
+      <div class="profile-popover-header">
+        <div class="profile-avatar-wrap">
+          <img src="" alt="Avatar" class="profile-large-avatar" id="popoverAvatarImg">
         </div>
-        <p class="session-countdown-text" id="sessionCountdownText">⏱️ หมดอายุใน 60 นาที (ตัดอัตโนมัติหากไม่ใช้งาน 30 น.)</p>
+        <div class="profile-info-wrap">
+          <h3 class="profile-name" id="popoverUserName">ผู้ใช้ Google</h3>
+          <p class="profile-email" id="popoverUserEmail">user@gmail.com</p>
+        </div>
+        <button type="button" class="btn btn-icon profile-close-btn" id="closeProfilePopoverBtn" title="ปิด">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
 
-      <!-- Profile Shelf Stats -->
-      <div class="profile-stats-row">
-        <div class="profile-stat-item">
-          <span class="stat-number" id="popoverBookCount">0</span>
-          <span class="stat-label">หนังสือในบัญชีนี้</span>
+      <div class="profile-popover-body">
+        <div class="profile-meta-row">
+          <span class="meta-label">เซสชันปลอดภัย</span>
+          <span class="meta-value" id="sessionCountdownText">⏱️ 60 นาที</span>
         </div>
-        <div class="profile-stat-item">
-          <span class="stat-number" id="popoverActiveState">ระดับสูง</span>
-          <span class="stat-label">ความปลอดภัย</span>
+        <div class="profile-meta-row">
+          <span class="meta-label">ประวัติการอ่าน</span>
+          <span class="meta-value" id="popoverBookCount">0 เล่ม</span>
         </div>
+      </div>
+
+      <div class="profile-popover-footer">
+        <button type="button" class="popover-item-btn text-danger" id="signOutBtn">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span>ออกจากระบบ (สลับเป็น Guest)</span>
+        </button>
       </div>
     </div>
 
-    <div class="profile-popover-footer">
-      <button type="button" class="btn btn-danger-subtle btn-block" id="signOutBtn">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-        <span>ออกจากระบบ (สลับเป็น Guest)</span>
-      </button>
+    <!-- View B: Guest User -->
+    <div class="popover-view" id="popoverGuestView">
+      <div class="profile-popover-header">
+        <div class="profile-avatar-wrap guest-icon-box">
+          <svg class="icon" viewBox="0 0 24 24">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </div>
+        <div class="profile-info-wrap">
+          <h3 class="profile-name">โหมดผู้เยี่ยมชม</h3>
+          <p class="profile-email">อ่านออฟไลน์บนอุปกรณ์นี้</p>
+        </div>
+        <button type="button" class="btn btn-icon profile-close-btn" id="closeGuestPopoverBtn" title="ปิด">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="profile-popover-body">
+        <p class="guest-intro-text">เข้าสู่ระบบด้วย Google เพื่อเปิดไฟล์จาก Google Drive และจดจำประวัติการอ่านแยกตามบัญชีของคุณ</p>
+      </div>
+
+      <div class="profile-popover-footer">
+        <button type="button" class="btn btn-primary btn-block popover-signin-btn" id="guestSignInBtn">
+          <svg class="icon icon-drive-g" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
+            <path fill="currentColor" d="M12.01 1.49L4.47 14.54l3.75 6.49 7.54-13.05z" />
+            <path fill="currentColor" d="M4.47 14.54L.72 21.03h15.08l3.75-6.49z" />
+            <path fill="currentColor" d="M19.55 14.54L15.8 8.05H8.22l3.75 6.49z" />
+          </svg>
+          <span>เข้าสู่ระบบ Google</span>
+        </button>
+      </div>
     </div>
+
   </div>
 
   <!-- Google Drive Credentials Settings Modal (Zero-Hardcode: Browser-only storage) -->

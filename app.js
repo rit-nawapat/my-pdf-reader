@@ -108,21 +108,22 @@ let currentDriveFileId = null;
 let driveSyncTimer = null;
 
 // Auth & User Profile Session Management
-const authProfileWrap = document.getElementById('authProfileWrap');
-const authActionBtn = document.getElementById('authActionBtn');
 const authProfileBtn = document.getElementById('authProfileBtn');
+const guestUserIcon = document.getElementById('guestUserIcon');
 const userAvatarImg = document.getElementById('userAvatarImg');
+const avatarStatusDot = document.getElementById('avatarStatusDot');
 const profileBackdrop = document.getElementById('profileBackdrop');
 const profilePopover = document.getElementById('profilePopover');
+const popoverLoggedInView = document.getElementById('popoverLoggedInView');
+const popoverGuestView = document.getElementById('popoverGuestView');
 const popoverAvatarImg = document.getElementById('popoverAvatarImg');
 const popoverUserName = document.getElementById('popoverUserName');
 const popoverUserEmail = document.getElementById('popoverUserEmail');
 const closeProfilePopoverBtn = document.getElementById('closeProfilePopoverBtn');
-const sessionStatusBadge = document.getElementById('sessionStatusBadge');
-const sessionStatusText = document.getElementById('sessionStatusText');
+const closeGuestPopoverBtn = document.getElementById('closeGuestPopoverBtn');
 const sessionCountdownText = document.getElementById('sessionCountdownText');
 const popoverBookCount = document.getElementById('popoverBookCount');
-const popoverActiveState = document.getElementById('popoverActiveState');
+const guestSignInBtn = document.getElementById('guestSignInBtn');
 const signOutBtn = document.getElementById('signOutBtn');
 const shelfSubtitle = document.getElementById('shelfSubtitle');
 
@@ -1966,34 +1967,45 @@ function updateSessionCountdownUI() {
 
 function updateAuthUI() {
   const profile = getActiveProfile();
-  if (!authActionBtn || !authProfileBtn) return;
+  if (!authProfileBtn) return;
 
   if (profile.isGuest) {
-    authActionBtn.style.display = 'inline-flex';
-    authProfileBtn.style.display = 'none';
-    if (userAvatarImg) userAvatarImg.src = '';
+    if (guestUserIcon) guestUserIcon.style.display = 'block';
+    if (userAvatarImg) userAvatarImg.style.display = 'none';
+    if (avatarStatusDot) avatarStatusDot.style.display = 'none';
+    authProfileBtn.title = 'เข้าสู่ระบบ Google / โปรไฟล์';
   } else {
-    authActionBtn.style.display = 'none';
-    authProfileBtn.style.display = 'inline-flex';
+    if (guestUserIcon) guestUserIcon.style.display = 'none';
     if (userAvatarImg) {
       userAvatarImg.src = profile.picture || '';
       userAvatarImg.alt = profile.name || 'User Avatar';
+      userAvatarImg.style.display = 'block';
     }
+    if (avatarStatusDot) avatarStatusDot.style.display = 'block';
+    authProfileBtn.title = `โปรไฟล์: ${profile.name} (คลิกเพื่อดูรายละเอียด)`;
   }
 }
 
 function openProfilePopover() {
   const profile = getActiveProfile();
-  if (profile.isGuest || !profilePopover) return;
+  if (!profilePopover) return;
 
-  if (popoverAvatarImg) popoverAvatarImg.src = profile.picture || '';
-  if (popoverUserName) popoverUserName.textContent = profile.name || 'ผู้ใช้ Google';
-  if (popoverUserEmail) popoverUserEmail.textContent = profile.email || '';
+  if (profile.isGuest) {
+    if (popoverGuestView) popoverGuestView.style.display = 'block';
+    if (popoverLoggedInView) popoverLoggedInView.style.display = 'none';
+  } else {
+    if (popoverGuestView) popoverGuestView.style.display = 'none';
+    if (popoverLoggedInView) popoverLoggedInView.style.display = 'block';
 
-  const books = getRecentFiles();
-  if (popoverBookCount) popoverBookCount.textContent = books.length.toString();
+    if (popoverAvatarImg) popoverAvatarImg.src = profile.picture || '';
+    if (popoverUserName) popoverUserName.textContent = profile.name || 'ผู้ใช้ Google';
+    if (popoverUserEmail) popoverUserEmail.textContent = profile.email || '';
 
-  updateSessionCountdownUI();
+    const books = getRecentFiles();
+    if (popoverBookCount) popoverBookCount.textContent = `${books.length} เล่ม`;
+
+    updateSessionCountdownUI();
+  }
 
   if (profileBackdrop) profileBackdrop.style.display = 'block';
   profilePopover.style.display = 'block';
@@ -2016,7 +2028,7 @@ function closeProfilePopover() {
       if (profileBackdrop) profileBackdrop.style.display = 'none';
       profilePopover.style.display = 'none';
     }
-  }, 220);
+  }, 200);
 }
 
 function toggleProfilePopover() {
@@ -2029,6 +2041,7 @@ function toggleProfilePopover() {
 }
 
 function handleSignInClick() {
+  closeProfilePopover();
   const cfg = getGdriveConfig();
   if (!cfg || !cfg.clientId) {
     showToast('กรุณากรอก Client ID ในหน้าตั้งค่าก่อนเข้าสู่ระบบ');
@@ -2149,10 +2162,11 @@ function openGoogleDrivePicker() {
   }
 }
 
-if (authActionBtn) authActionBtn.addEventListener('click', handleSignInClick);
 if (authProfileBtn) authProfileBtn.addEventListener('click', toggleProfilePopover);
 if (closeProfilePopoverBtn) closeProfilePopoverBtn.addEventListener('click', closeProfilePopover);
+if (closeGuestPopoverBtn) closeGuestPopoverBtn.addEventListener('click', closeProfilePopover);
 if (profileBackdrop) profileBackdrop.addEventListener('click', closeProfilePopover);
+if (guestSignInBtn) guestSignInBtn.addEventListener('click', handleSignInClick);
 
 if (signOutBtn) {
   signOutBtn.addEventListener('click', () => {
