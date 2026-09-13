@@ -990,11 +990,16 @@ viewerContainer.addEventListener('scroll', () => {
   }, 60);
 });
 
-// Desktop top hover reveal
+// Desktop top and bottom hover reveal
 document.addEventListener('mousemove', (e) => {
   if (!currentPdf || dropZone.style.display !== 'none') return;
   if (e.clientY <= 50) {
     if (floatingCapsule) floatingCapsule.classList.remove('hidden');
+  }
+  if (window.innerHeight - e.clientY <= 70) {
+    if (bottomBar && (!flyoutMenu || !flyoutMenu.classList.contains('open'))) {
+      bottomBar.classList.remove('hidden');
+    }
   }
 });
 
@@ -1103,22 +1108,25 @@ pageNumberInput.addEventListener('keydown', (e) => {
 });
 
 const scrubberTrack = document.getElementById('scrubberTrack');
+const scrubberProgress = document.getElementById('scrubberProgress');
 const scrubberThumb = document.getElementById('scrubberThumb');
 let isDraggingScrubber = false;
 
 function updateScrubberVisuals(pageNum) {
   if (!totalPages || totalPages <= 1) {
-    if (scrubberThumb) scrubberThumb.style.top = '0%';
+    if (scrubberThumb) scrubberThumb.style.left = '0%';
+    if (scrubberProgress) scrubberProgress.style.width = '0%';
     if (sliderTooltip) {
-      sliderTooltip.style.top = '0%';
+      sliderTooltip.style.left = '0%';
       sliderTooltip.textContent = `หน้า 1`;
     }
     return;
   }
   const pct = Math.max(0, Math.min(1, (pageNum - 1) / (totalPages - 1))) * 100;
-  if (scrubberThumb) scrubberThumb.style.top = `${pct}%`;
+  if (scrubberThumb) scrubberThumb.style.left = `${pct}%`;
+  if (scrubberProgress) scrubberProgress.style.width = `${pct}%`;
   if (sliderTooltip) {
-    sliderTooltip.style.top = `${pct}%`;
+    sliderTooltip.style.left = `${pct}%`;
     sliderTooltip.textContent = `หน้า ${pageNum} / ${totalPages}`;
   }
 }
@@ -1127,8 +1135,8 @@ function handleScrubberPointer(e) {
   if (!currentPdf || totalPages <= 1) return currentPage;
   const trackEl = scrubberTrack || bottomBar;
   const rect = trackEl.getBoundingClientRect();
-  const clickY = e.clientY - rect.top;
-  const pct = Math.max(0, Math.min(1, clickY / rect.height));
+  const clickX = e.clientX - rect.left;
+  const pct = Math.max(0, Math.min(1, clickX / rect.width));
   const targetPage = Math.round(1 + pct * (totalPages - 1));
 
   updateScrubberVisuals(targetPage);
@@ -1441,6 +1449,7 @@ document.addEventListener('click', (e) => {
 function openFlyoutMenu() {
   if (flyoutMenu) flyoutMenu.classList.add('open');
   if (flyoutBackdrop) flyoutBackdrop.classList.add('open');
+  if (bottomBar) bottomBar.classList.add('hidden');
 }
 
 function closeFlyoutMenu() {
