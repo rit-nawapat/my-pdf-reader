@@ -920,6 +920,7 @@ body.theme-dark .flyout-menu {
 .shelf-wrapper {
   max-width: 760px;
   width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 28px;
@@ -1056,6 +1057,7 @@ body.theme-dark .flyout-menu {
 /* Bookshelf Section */
 .shelf-section {
   width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1066,6 +1068,8 @@ body.theme-dark .flyout-menu {
   align-items: center;
   justify-content: space-between;
   padding: 0 2px;
+  width: 100%;
+  min-width: 0;
 }
 
 .shelf-subtitle {
@@ -1079,6 +1083,7 @@ body.theme-dark .flyout-menu {
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
   width: 100%;
+  min-width: 0;
 }
 
 .recent-card {
@@ -1095,6 +1100,10 @@ body.theme-dark .flyout-menu {
   gap: 10px;
   min-height: 94px;
   user-select: none;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .recent-card:hover {
@@ -1113,6 +1122,8 @@ body.theme-dark .flyout-menu {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .recent-info {
@@ -1121,6 +1132,7 @@ body.theme-dark .flyout-menu {
   gap: 4px;
   min-width: 0;
   flex: 1;
+  overflow: hidden;
 }
 
 .recent-name {
@@ -1130,6 +1142,9 @@ body.theme-dark .flyout-menu {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: block;
+  width: 100%;
+  min-width: 0;
 }
 
 .recent-sub {
@@ -1139,6 +1154,7 @@ body.theme-dark .flyout-menu {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .recent-remove-btn {
@@ -1154,6 +1170,7 @@ body.theme-dark .flyout-menu {
   cursor: pointer;
   transition: all 0.12s ease;
   opacity: 0.6;
+  flex-shrink: 0;
 }
 
 .recent-card:hover .recent-remove-btn {
@@ -1557,23 +1574,52 @@ body.theme-dark .floating-mini-scrubber {
   }
 
   .recent-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     width: 100%;
+    min-width: 0;
   }
 
   .recent-card {
     width: 100%;
+    min-width: 0;
     box-sizing: border-box;
+    overflow: hidden;
     padding: 12px 14px;
+  }
+
+  .recent-top {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .recent-info {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
   }
 
   .recent-name {
     font-size: 13px;
+    width: 100%;
+    min-width: 0;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .recent-sub {
+    font-size: 11px;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .recent-remove-btn {
-    opacity: 0.8;
+    opacity: 0.85;
+    flex-shrink: 0;
   }
 
   /* Mobile Sidebar takes 85% of screen */
@@ -1607,15 +1653,113 @@ body.theme-dark .floating-mini-scrubber {
   }
 }
 
-/* Extra Small Phones (< 360px) */
+/* Compact Phones (<= 480px - e.g. iPhone SE, iPhone 12/13 Mini, Pixel) */
+@media (max-width: 480px) {
+  .drop-zone {
+    padding: calc(16px + env(safe-area-inset-top, 8px)) 14px calc(36px + env(safe-area-inset-bottom, 16px)) 14px;
+  }
+
+  .library-header {
+    gap: 6px;
+  }
+
+  .library-brand {
+    gap: 6px;
+  }
+
+  .library-logo {
+    width: 22px;
+    height: 22px;
+  }
+
+  .library-title {
+    font-size: 17px;
+  }
+
+  .library-actions {
+    gap: 6px;
+  }
+
+  .capsule-action-btn {
+    height: 35px;
+    padding: 0 10px;
+    font-size: 12.5px;
+    gap: 5px;
+  }
+
+  .library-settings-btn {
+    width: 35px;
+    height: 35px;
+  }
+
+  .recent-card {
+    padding: 11px 13px;
+  }
+
+  .floating-mini-scrubber {
+    width: calc(100vw - 28px);
+    height: 36px;
+    padding: 0 14px;
+    bottom: calc(18px + env(safe-area-inset-bottom, 10px));
+  }
+}
+
+/* Extra Small & Narrow Phones (<= 360px - e.g. Galaxy Z Fold, iPhone 5) */
 @media (max-width: 360px) {
-  .capsule-title {
-    max-width: 75px;
+  .drop-zone {
+    padding: calc(12px + env(safe-area-inset-top, 6px)) 10px calc(32px + env(safe-area-inset-bottom, 12px)) 10px;
+  }
+
+  .library-header {
+    gap: 4px;
+  }
+
+  .library-logo {
+    width: 18px;
+    height: 18px;
+  }
+
+  .library-title {
+    font-size: 14px;
+  }
+
+  .capsule-action-btn {
+    height: 32px;
+    padding: 0 8px;
     font-size: 11px;
+    gap: 4px;
+  }
+
+  .capsule-action-btn svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .library-settings-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .recent-card {
+    padding: 9px 10px;
+    min-height: 76px;
+  }
+
+  .recent-name {
+    font-size: 12px;
+  }
+
+  .recent-sub {
+    font-size: 10px;
+  }
+
+  .capsule-title {
+    max-width: 68px;
+    font-size: 10.5px;
   }
 
   .capsule-page-indicator input {
-    width: 22px;
+    width: 20px;
     font-size: 10px;
   }
 
@@ -1628,6 +1772,13 @@ body.theme-dark .floating-mini-scrubber {
     width: 26px;
     height: 26px;
     min-width: 26px;
+  }
+
+  .floating-mini-scrubber {
+    width: calc(100vw - 16px);
+    height: 32px;
+    padding: 0 10px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 6px));
   }
 }
 
