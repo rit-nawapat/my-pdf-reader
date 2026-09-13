@@ -107,6 +107,33 @@ let gisInited = false;
 let currentDriveFileId = null;
 let driveSyncTimer = null;
 
+// Auth & User Profile Session Management
+const authProfileWrap = document.getElementById('authProfileWrap');
+const authActionBtn = document.getElementById('authActionBtn');
+const authProfileBtn = document.getElementById('authProfileBtn');
+const userAvatarImg = document.getElementById('userAvatarImg');
+const profileBackdrop = document.getElementById('profileBackdrop');
+const profilePopover = document.getElementById('profilePopover');
+const popoverAvatarImg = document.getElementById('popoverAvatarImg');
+const popoverUserName = document.getElementById('popoverUserName');
+const popoverUserEmail = document.getElementById('popoverUserEmail');
+const closeProfilePopoverBtn = document.getElementById('closeProfilePopoverBtn');
+const sessionStatusBadge = document.getElementById('sessionStatusBadge');
+const sessionStatusText = document.getElementById('sessionStatusText');
+const sessionCountdownText = document.getElementById('sessionCountdownText');
+const popoverBookCount = document.getElementById('popoverBookCount');
+const popoverActiveState = document.getElementById('popoverActiveState');
+const signOutBtn = document.getElementById('signOutBtn');
+const shelfSubtitle = document.getElementById('shelfSubtitle');
+
+const SESSION_STORAGE_KEY = 'pdf_reader_session';
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes inactivity timeout
+const ABSOLUTE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour absolute token lifespan
+let sessionWatchdogTimer = null;
+let lastUserActivityAt = Date.now();
+let lastActivityUpdateSent = 0;
+let pendingAuthCallback = null;
+
 // Touch tracking for gestures
 let touchStartX = 0;
 let touchStartY = 0;
@@ -265,12 +292,35 @@ async function clearAllPdfFromIDB() {
 }
 
 // ==========================================================================
-// Shelf & Recent Files Manager
+// Shelf & Recent Files Manager (Profile-Scoped)
 // ==========================================================================
+
+function getProfileRecentKey() {
+  const profile = getActiveProfile();
+  return `pdf_reader_recents_${profile.id}`;
+}
+
+function getUserScopedKey(baseKey) {
+  if (!baseKey) return baseKey;
+  const profile = getActiveProfile();
+  return `${baseKey}_${profile.id}`;
+}
+
+function migrateLegacyGuestRecents() {
+  const guestKey = 'pdf_reader_recents_guest';
+  if (!localStorage.getItem(guestKey)) {
+    const legacy = localStorage.getItem('pdf_reader_recent_files');
+    if (legacy) {
+      localStorage.setItem(guestKey, legacy);
+    }
+  }
+}
 
 function getRecentFiles() {
   try {
-    const raw = localStorage.getItem(RECENT_STORAGE_KEY);
+    migrateLegacyGuestRecents();
+    const key = getProfileRecentKey();
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
     return [];
@@ -301,14 +351,15 @@ function saveRecentFile(meta) {
 
   if (list.length > 12) list.pop();
 
-  localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(list));
+  localStorage.setItem(getProfileRecentKey(), JSON.stringify(list));
 }
 
 function removeRecentFile(id, e) {
   if (e) e.stopPropagation();
   let list = getRecentFiles();
   list = list.filter((item) => item.id !== id);
-  localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(list));
+  localStorage.setItem(getProfileRecentKey(), JSON.stringify(list));
+  localStorage.removeItem(getUserScopedKey(id));
   localStorage.removeItem(id);
   deletePdfFromIDB(id);
   renderRecentShelf();
@@ -316,8 +367,10 @@ function removeRecentFile(id, e) {
 }
 
 function clearAllRecents() {
-  if (confirm('ต้องการล้างประวัติการอ่านทั้งหมดหรือไม่?')) {
-    localStorage.removeItem(RECENT_STORAGE_KEY);
+  const profile = getActiveProfile();
+  const label = profile.isGuest ? 'โหมดทั่วไป (Guest)' : `โปรไฟล์ "${profile.name}"`;
+  if (confirm(`ต้องการล้างประวัติการอ่านของ ${label} ทั้งหมดหรือไม่?`)) {
+    localStorage.removeItem(getProfileRecentKey());
     clearAllPdfFromIDB();
     renderRecentShelf();
     showToast('ล้างประวัติเรียบร้อย');
@@ -341,7 +394,16 @@ function formatRelativeTime(isoString) {
 
 function renderRecentShelf() {
   if (!recentGrid || !shelfSection) return;
+  const profile = getActiveProfile();
   const list = getRecentFiles();
+
+  if (shelfSubtitle) {
+    if (profile.isGuest) {
+      shelfSubtitle.textContent = 'อ่านต่อจากที่ค้างไว้ (โหมดทั่วไป)';
+    } else {
+      shelfSubtitle.textContent = `ประวัติการอ่านของ ${profile.name}`;
+    }
+  }
 
   if (list.length === 0) {
     shelfSection.style.display = 'none';
@@ -530,7 +592,11 @@ async function loadFile(file, targetPage = null) {
     totalPages = currentPdf.numPages;
 
     // Determine target page to open
-    const savedPage = localStorage.getItem(currentFileKey);
+    const scopedKey = getUserScopedKey(currentFileKey);
+    let savedPage = localStorage.getItem(scopedKey);
+    if (!savedPage) {
+      savedPage = localStorage.getItem(currentFileKey);
+    }
     let pageToOpen = 1;
     if (targetPage && targetPage >= 1 && targetPage <= totalPages) {
       pageToOpen = targetPage;
@@ -578,7 +644,7 @@ async function loadFile(file, targetPage = null) {
     savePdfToIDB(currentFileKey, file);
 
     // Save reading state to shelf and storage
-    localStorage.setItem(currentFileKey, pageToOpen.toString());
+    localStorage.setItem(getUserScopedKey(currentFileKey), pageToOpen.toString());
     saveRecentFile({
       id: currentFileKey,
       name: file.name,
@@ -1037,7 +1103,7 @@ function updateCurrentPageFromScroll() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       if (currentFileKey && !isJumpingToPage) {
-        localStorage.setItem(currentFileKey, currentPage.toString());
+        localStorage.setItem(getUserScopedKey(currentFileKey), currentPage.toString());
         saveRecentFile({
           id: currentFileKey,
           name: fileNameEl.title || fileNameEl.textContent,
@@ -1110,7 +1176,7 @@ function scrollToPage(pageNum, smooth = true) {
   }, lockDuration);
 
   if (currentFileKey) {
-    localStorage.setItem(currentFileKey, currentPage.toString());
+    localStorage.setItem(getUserScopedKey(currentFileKey), currentPage.toString());
     saveRecentFile({
       id: currentFileKey,
       name: fileNameEl.title || fileNameEl.textContent,
@@ -1753,6 +1819,234 @@ if (saveConfigBtn) {
 }
 
 // ==========================================================================
+// User Session & Authentication Manager
+// ==========================================================================
+
+function getSessionRaw() {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getSession() {
+  const session = getSessionRaw();
+  if (!session || !session.token) return null;
+
+  const now = Date.now();
+  // 1. Check absolute token expiry (1 hour max)
+  if (now >= session.expiresAt) {
+    console.info('[Session] Expired by absolute 1-hour time limit');
+    clearSession(false);
+    return null;
+  }
+  // 2. Check idle inactivity (30 minutes without touch/key/scroll)
+  if (now - session.lastActiveAt >= IDLE_TIMEOUT_MS) {
+    console.info('[Session] Expired by 30-minute idle inactivity');
+    clearSession(false, true);
+    return null;
+  }
+  return session;
+}
+
+function saveSession(token, expiresInSec, userInfo) {
+  const now = Date.now();
+  const session = {
+    token,
+    expiresAt: now + (expiresInSec ? expiresInSec * 1000 : ABSOLUTE_EXPIRY_MS),
+    lastActiveAt: now,
+    user: {
+      id: userInfo.sub || userInfo.id || 'user',
+      name: userInfo.name || 'Google User',
+      email: userInfo.email || '',
+      picture: userInfo.picture || ''
+    }
+  };
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  gdriveAccessToken = token;
+  lastUserActivityAt = now;
+  return session;
+}
+
+function clearSession(revoke = true, isIdleTimeout = false) {
+  const current = getSessionRaw();
+  if (revoke && current && current.token && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+    try {
+      google.accounts.oauth2.revoke(current.token, () => {
+        console.info('[Auth] Google OAuth token revoked');
+      });
+    } catch (e) {
+      console.warn('[Auth] Revoke token warning:', e);
+    }
+  }
+
+  gdriveAccessToken = null;
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+  closeProfilePopover();
+  updateAuthUI();
+  renderRecentShelf();
+
+  if (isIdleTimeout) {
+    showToast('เซสชันหมดอายุเนื่องจากไม่มีการใช้งานเกิน 30 นาที (สลับเป็น Guest)');
+  }
+}
+
+function getActiveProfile() {
+  const session = getSession();
+  if (session && session.user && session.user.id) {
+    return {
+      id: session.user.id,
+      name: session.user.name,
+      email: session.user.email,
+      picture: session.user.picture,
+      isGuest: false
+    };
+  }
+  return {
+    id: 'guest',
+    name: 'ผู้เยี่ยมชม (Guest)',
+    email: '',
+    picture: '',
+    isGuest: true
+  };
+}
+
+function registerUserActivity() {
+  const now = Date.now();
+  lastUserActivityAt = now;
+  // Throttle disk update to every 30 seconds
+  if (now - lastActivityUpdateSent > 30000) {
+    lastActivityUpdateSent = now;
+    const session = getSessionRaw();
+    if (session) {
+      session.lastActiveAt = now;
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    }
+  }
+}
+
+function initActivityListeners() {
+  const events = ['pointerdown', 'touchstart', 'keydown', 'scroll'];
+  events.forEach((evt) => {
+    window.addEventListener(evt, registerUserActivity, { passive: true });
+  });
+}
+
+function startSessionWatchdog() {
+  if (sessionWatchdogTimer) clearInterval(sessionWatchdogTimer);
+  sessionWatchdogTimer = setInterval(() => {
+    const raw = getSessionRaw();
+    if (raw) {
+      const valid = getSession();
+      if (!valid) {
+        return;
+      }
+      updateSessionCountdownUI();
+    }
+  }, 30000);
+}
+
+function updateSessionCountdownUI() {
+  const session = getSession();
+  if (!session || !sessionCountdownText) return;
+  const now = Date.now();
+  const remainingMs = Math.max(0, session.expiresAt - now);
+  const idleRemainingMs = Math.max(0, IDLE_TIMEOUT_MS - (now - session.lastActiveAt));
+  const effectiveMs = Math.min(remainingMs, idleRemainingMs);
+  const mins = Math.ceil(effectiveMs / 60000);
+
+  if (mins <= 1) {
+    sessionCountdownText.textContent = '⏱️ กำลังจะหมดอายุในไม่กี่วินาที (หากไม่เคลื่อนไหว)';
+  } else {
+    sessionCountdownText.textContent = `⏱️ หมดอายุใน ${mins} นาที (ตัดหากไม่ใช้งาน 30 น.)`;
+  }
+}
+
+function updateAuthUI() {
+  const profile = getActiveProfile();
+  if (!authActionBtn || !authProfileBtn) return;
+
+  if (profile.isGuest) {
+    authActionBtn.style.display = 'inline-flex';
+    authProfileBtn.style.display = 'none';
+    if (userAvatarImg) userAvatarImg.src = '';
+  } else {
+    authActionBtn.style.display = 'none';
+    authProfileBtn.style.display = 'inline-flex';
+    if (userAvatarImg) {
+      userAvatarImg.src = profile.picture || '';
+      userAvatarImg.alt = profile.name || 'User Avatar';
+    }
+  }
+}
+
+function openProfilePopover() {
+  const profile = getActiveProfile();
+  if (profile.isGuest || !profilePopover) return;
+
+  if (popoverAvatarImg) popoverAvatarImg.src = profile.picture || '';
+  if (popoverUserName) popoverUserName.textContent = profile.name || 'ผู้ใช้ Google';
+  if (popoverUserEmail) popoverUserEmail.textContent = profile.email || '';
+
+  const books = getRecentFiles();
+  if (popoverBookCount) popoverBookCount.textContent = books.length.toString();
+
+  updateSessionCountdownUI();
+
+  if (profileBackdrop) profileBackdrop.style.display = 'block';
+  profilePopover.style.display = 'block';
+
+  requestAnimationFrame(() => {
+    if (profileBackdrop) profileBackdrop.classList.add('open');
+    profilePopover.classList.add('open');
+    profilePopover.setAttribute('aria-hidden', 'false');
+  });
+}
+
+function closeProfilePopover() {
+  if (!profilePopover) return;
+  if (profileBackdrop) profileBackdrop.classList.remove('open');
+  profilePopover.classList.remove('open');
+  profilePopover.setAttribute('aria-hidden', 'true');
+
+  setTimeout(() => {
+    if (!profilePopover.classList.contains('open')) {
+      if (profileBackdrop) profileBackdrop.style.display = 'none';
+      profilePopover.style.display = 'none';
+    }
+  }, 220);
+}
+
+function toggleProfilePopover() {
+  if (!profilePopover) return;
+  if (profilePopover.classList.contains('open')) {
+    closeProfilePopover();
+  } else {
+    openProfilePopover();
+  }
+}
+
+function handleSignInClick() {
+  const cfg = getGdriveConfig();
+  if (!cfg || !cfg.clientId) {
+    showToast('กรุณากรอก Client ID ในหน้าตั้งค่าก่อนเข้าสู่ระบบ');
+    openSettingsModal();
+    return;
+  }
+  if (!tokenClient || !gisInited) {
+    initGoogleClients();
+  }
+  if (tokenClient) {
+    tokenClient.requestAccessToken({ prompt: 'select_account' });
+  } else {
+    showToast('กำลังเตรียมระบบ Google... กรุณากดใหม่อีกครั้ง');
+    setTimeout(initGoogleClients, 1000);
+  }
+}
+
+// ==========================================================================
 // Google Identity Services (GIS) & Google Picker Integration
 // ==========================================================================
 
@@ -1770,22 +2064,48 @@ function initGoogleClients() {
     }
   }
 
+  // Restore existing session token if available
+  const existingSession = getSession();
+  if (existingSession && existingSession.token) {
+    gdriveAccessToken = existingSession.token;
+  }
+
   // 2. Initialize GIS TokenClient if config exists
   if (cfg && cfg.clientId && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
     try {
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: cfg.clientId,
-        scope: 'https://www.googleapis.com/auth/drive.file',
-        callback: (resp) => {
+        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid',
+        callback: async (resp) => {
           if (resp.error !== undefined) {
             console.error('GIS Error:', resp);
             showToast('เข้าสู่ระบบไม่สำเร็จ: ' + (resp.error_description || resp.error));
             return;
           }
           gdriveAccessToken = resp.access_token;
-          showToast('เชื่อมต่อ Google Drive สำเร็จ');
-          if (cfg.apiKey) {
-            createAndShowPicker(cfg.apiKey, cfg.clientId);
+
+          // Fetch Google User Profile info
+          let userInfo = { name: 'Google User', email: '', picture: '' };
+          try {
+            const userResp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${resp.access_token}` }
+            });
+            if (userResp.ok) {
+              userInfo = await userResp.json();
+            }
+          } catch (err) {
+            console.warn('UserInfo fetch warning:', err);
+          }
+
+          saveSession(resp.access_token, resp.expires_in, userInfo);
+          updateAuthUI();
+          renderRecentShelf();
+          showToast(`ยินดีต้อนรับ ${userInfo.name || 'เข้าสู่ระบบสำเร็จ'}`);
+
+          if (pendingAuthCallback) {
+            const cb = pendingAuthCallback;
+            pendingAuthCallback = null;
+            cb();
           }
         }
       });
@@ -1808,7 +2128,15 @@ function openGoogleDrivePicker() {
     initGoogleClients();
   }
 
+  const session = getSession();
+  if (session && session.token) {
+    gdriveAccessToken = session.token;
+  }
+
   if (!gdriveAccessToken) {
+    pendingAuthCallback = () => {
+      createAndShowPicker(cfg.apiKey, cfg.clientId);
+    };
     showToast('กำลังขอสิทธิ์เข้าถึง Google Drive...');
     if (tokenClient) {
       tokenClient.requestAccessToken({ prompt: '' });
@@ -1819,6 +2147,20 @@ function openGoogleDrivePicker() {
   } else {
     createAndShowPicker(cfg.apiKey, cfg.clientId);
   }
+}
+
+if (authActionBtn) authActionBtn.addEventListener('click', handleSignInClick);
+if (authProfileBtn) authProfileBtn.addEventListener('click', toggleProfilePopover);
+if (closeProfilePopoverBtn) closeProfilePopoverBtn.addEventListener('click', closeProfilePopover);
+if (profileBackdrop) profileBackdrop.addEventListener('click', closeProfilePopover);
+
+if (signOutBtn) {
+  signOutBtn.addEventListener('click', () => {
+    if (confirm('ต้องการออกจากระบบและสลับเป็นโหมดผู้เยี่ยมชม (Guest) หรือไม่?')) {
+      clearSession(true);
+      showToast('ออกจากระบบเรียบร้อยแล้ว (สลับเป็น Guest)');
+    }
+  });
 }
 
 if (driveOpenBtn) driveOpenBtn.addEventListener('click', openGoogleDrivePicker);
@@ -1957,6 +2299,9 @@ function debounceSyncDrivePage(fileId, pageNum) {
 checkUrlSetup();
 window.addEventListener('hashchange', checkUrlSetup);
 initTheme();
+initActivityListeners();
+startSessionWatchdog();
+updateAuthUI();
 renderRecentShelf();
 setTimeout(initGoogleClients, 600);
 
