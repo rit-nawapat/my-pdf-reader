@@ -548,6 +548,7 @@ async function loadFile(file, targetPage = null) {
     pageCountEl.textContent = totalPages;
     pageSlider.max = totalPages;
     pageSlider.value = pageToOpen;
+    updateScrubberVisuals(pageToOpen);
 
     const firstPage = await currentPdf.getPage(1);
     baseViewport = firstPage.getViewport({ scale: 1.0 });
@@ -1020,6 +1021,7 @@ function updateCurrentPageFromScroll() {
     currentPage = closestPage;
     pageNumberInput.value = currentPage;
     pageSlider.value = currentPage;
+    updateScrubberVisuals(currentPage);
     updateActiveThumbnail(currentPage);
 
     clearTimeout(saveTimer);
@@ -1049,6 +1051,7 @@ function scrollToPage(pageNum, smooth = true) {
   currentPage = pageNum;
   pageNumberInput.value = currentPage;
   pageSlider.value = currentPage;
+  updateScrubberVisuals(currentPage);
   updateActiveThumbnail(currentPage);
 
   const targetEl = document.getElementById(`page-${pageNum}`);
@@ -1099,16 +1102,85 @@ pageNumberInput.addEventListener('keydown', (e) => {
   }
 });
 
-pageSlider.addEventListener('input', (e) => {
-  const val = e.target.value;
-  sliderTooltip.textContent = `หน้า ${val}`;
-  sliderTooltip.classList.add('visible');
-});
+const scrubberTrack = document.getElementById('scrubberTrack');
+const scrubberThumb = document.getElementById('scrubberThumb');
+let isDraggingScrubber = false;
 
-pageSlider.addEventListener('change', (e) => {
-  sliderTooltip.classList.remove('visible');
-  scrollToPage(parseInt(e.target.value, 10));
-});
+function updateScrubberVisuals(pageNum) {
+  if (!totalPages || totalPages <= 1) {
+    if (scrubberThumb) scrubberThumb.style.top = '0%';
+    if (sliderTooltip) {
+      sliderTooltip.style.top = '0%';
+      sliderTooltip.textContent = `หน้า 1`;
+    }
+    return;
+  }
+  const pct = Math.max(0, Math.min(1, (pageNum - 1) / (totalPages - 1))) * 100;
+  if (scrubberThumb) scrubberThumb.style.top = `${pct}%`;
+  if (sliderTooltip) {
+    sliderTooltip.style.top = `${pct}%`;
+    sliderTooltip.textContent = `หน้า ${pageNum} / ${totalPages}`;
+  }
+}
+
+function handleScrubberPointer(e) {
+  if (!currentPdf || totalPages <= 1) return currentPage;
+  const trackEl = scrubberTrack || bottomBar;
+  const rect = trackEl.getBoundingClientRect();
+  const clickY = e.clientY - rect.top;
+  const pct = Math.max(0, Math.min(1, clickY / rect.height));
+  const targetPage = Math.round(1 + pct * (totalPages - 1));
+
+  updateScrubberVisuals(targetPage);
+  if (sliderTooltip) sliderTooltip.classList.add('visible');
+  if (pageNumberInput) pageNumberInput.value = targetPage;
+  if (pageSlider) pageSlider.value = targetPage;
+
+  return targetPage;
+}
+
+if (bottomBar) {
+  bottomBar.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    isDraggingScrubber = true;
+    bottomBar.classList.add('dragging');
+    try { bottomBar.setPointerCapture(e.pointerId); } catch (_) {}
+    handleScrubberPointer(e);
+  });
+
+  bottomBar.addEventListener('pointermove', (e) => {
+    if (!isDraggingScrubber) return;
+    handleScrubberPointer(e);
+  });
+
+  const onPointerUp = (e) => {
+    if (!isDraggingScrubber) return;
+    isDraggingScrubber = false;
+    bottomBar.classList.remove('dragging');
+    try { bottomBar.releasePointerCapture(e.pointerId); } catch (_) {}
+    const targetPage = handleScrubberPointer(e);
+    if (sliderTooltip) sliderTooltip.classList.remove('visible');
+    if (targetPage) {
+      scrollToPage(targetPage);
+    }
+  };
+
+  bottomBar.addEventListener('pointerup', onPointerUp);
+  bottomBar.addEventListener('pointercancel', onPointerUp);
+}
+
+if (pageSlider) {
+  pageSlider.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    updateScrubberVisuals(val);
+    sliderTooltip.classList.add('visible');
+  });
+
+  pageSlider.addEventListener('change', (e) => {
+    sliderTooltip.classList.remove('visible');
+    scrollToPage(parseInt(e.target.value, 10));
+  });
+}
 
 // ==========================================================================
 // Zoom Controls
