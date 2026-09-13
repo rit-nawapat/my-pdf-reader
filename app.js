@@ -561,6 +561,7 @@ async function loadFile(file, targetPage = null) {
     }
     bottomBar.classList.add('visible');
     bottomBar.classList.remove('hidden');
+    if (typeof scheduleScrubberAutoHide === 'function') scheduleScrubberAutoHide(3000);
     if (shelfBtn) shelfBtn.style.display = 'inline-flex';
 
     calculateFitWidthScale();
@@ -978,7 +979,10 @@ viewerContainer.addEventListener('scroll', () => {
     } else if (delta < 0 || currentScrollTop < 40) {
       // Scrolling up -> reveal floating capsule and bottom bar
       if (floatingCapsule) floatingCapsule.classList.remove('hidden');
-      if (bottomBar) bottomBar.classList.remove('hidden');
+      if (bottomBar) {
+        bottomBar.classList.remove('hidden');
+        if (typeof scheduleScrubberAutoHide === 'function') scheduleScrubberAutoHide(2500);
+      }
     }
     lastScrollTop = currentScrollTop;
   }
@@ -999,6 +1003,7 @@ document.addEventListener('mousemove', (e) => {
   if (window.innerHeight - e.clientY <= 70) {
     if (bottomBar && (!flyoutMenu || !flyoutMenu.classList.contains('open'))) {
       bottomBar.classList.remove('hidden');
+      if (typeof scheduleScrubberAutoHide === 'function') scheduleScrubberAutoHide(2500);
     }
   }
 });
@@ -1111,6 +1116,16 @@ const scrubberTrack = document.getElementById('scrubberTrack');
 const scrubberProgress = document.getElementById('scrubberProgress');
 const scrubberThumb = document.getElementById('scrubberThumb');
 let isDraggingScrubber = false;
+let scrubberAutoHideTimer = null;
+
+function scheduleScrubberAutoHide(delay = 2500) {
+  clearTimeout(scrubberAutoHideTimer);
+  if (isDraggingScrubber) return;
+  scrubberAutoHideTimer = setTimeout(() => {
+    if (isDraggingScrubber) return;
+    if (bottomBar) bottomBar.classList.add('hidden');
+  }, delay);
+}
 
 function updateScrubberVisuals(pageNum) {
   if (!totalPages || totalPages <= 1) {
@@ -1148,8 +1163,17 @@ function handleScrubberPointer(e) {
 }
 
 if (bottomBar) {
+  bottomBar.addEventListener('mouseenter', () => {
+    clearTimeout(scrubberAutoHideTimer);
+  });
+
+  bottomBar.addEventListener('mouseleave', () => {
+    if (!isDraggingScrubber) scheduleScrubberAutoHide(1500);
+  });
+
   bottomBar.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    clearTimeout(scrubberAutoHideTimer);
     isDraggingScrubber = true;
     bottomBar.classList.add('dragging');
     try { bottomBar.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1171,6 +1195,7 @@ if (bottomBar) {
     if (targetPage) {
       scrollToPage(targetPage);
     }
+    scheduleScrubberAutoHide(2200);
   };
 
   bottomBar.addEventListener('pointerup', onPointerUp);
@@ -1354,7 +1379,12 @@ viewerContainer.addEventListener('touchend', (e) => {
         if (Date.now() - lastTapTime >= 320 && lastTapTime !== 0) {
           if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'A' && !e.target.closest('#floatingCapsule') && !e.target.closest('#flyoutMenu')) {
             if (floatingCapsule) floatingCapsule.classList.toggle('hidden');
-            if (bottomBar) bottomBar.classList.toggle('hidden');
+            if (bottomBar) {
+              bottomBar.classList.toggle('hidden');
+              if (!bottomBar.classList.contains('hidden') && typeof scheduleScrubberAutoHide === 'function') {
+                scheduleScrubberAutoHide(2500);
+              }
+            }
             closeFlyoutMenu();
           }
         }
