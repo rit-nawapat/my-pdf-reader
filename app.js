@@ -17,10 +17,13 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 // DOM Elements - Shell & Controls
 const fileInput = document.getElementById('fileInput');
 const dropZone = document.getElementById('dropZone');
-const dropZoneOpenBtn = document.getElementById('dropZoneOpenBtn');
+const openDocBtn = document.getElementById('openDocBtn');
+const openDocWrap = document.getElementById('openDocWrap');
+const openDocMenu = document.getElementById('openDocMenu');
 const viewerContainer = document.getElementById('viewerContainer');
 const viewer = document.getElementById('viewer');
-const toolbar = document.getElementById('toolbar');
+const floatingCapsule = document.getElementById('floatingCapsule');
+const toolbar = floatingCapsule; // Alias for backward compatibility
 const fileNameEl = document.getElementById('fileName');
 const pageNumberInput = document.getElementById('pageNumberInput');
 const pageCountEl = document.getElementById('pageCount');
@@ -37,17 +40,24 @@ const toastEl = document.getElementById('toast');
 const themeButtons = document.querySelectorAll('.theme-btn');
 const themeCycleBtn = document.getElementById('themeCycleBtn');
 
+// DOM Elements - Flyout Menu
+const capsuleMenuBtn = document.getElementById('capsuleMenuBtn');
+const flyoutMenu = document.getElementById('flyoutMenu');
+const flyoutBackdrop = document.getElementById('flyoutBackdrop');
+const closeFlyoutBtn = document.getElementById('closeFlyoutBtn');
+const flyoutSidebarBtn = document.getElementById('flyoutSidebarBtn');
+const flyoutSettingsBtn = document.getElementById('flyoutSettingsBtn');
+
 // DOM Elements - Shelf / Recent Files
 const shelfBtn = document.getElementById('shelfBtn');
 const shelfSection = document.getElementById('shelfSection');
 const recentGrid = document.getElementById('recentGrid');
 const clearRecentsBtn = document.getElementById('clearRecentsBtn');
-const dropZoneTitle = document.getElementById('dropZoneTitle');
-const dropZoneSubtitle = document.getElementById('dropZoneSubtitle');
+const emptyShelf = document.getElementById('emptyShelf');
 const RECENT_STORAGE_KEY = 'pdf_reader_recent_files';
 
 // DOM Elements - Sidebar & Panels
-const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+const toggleSidebarBtn = flyoutSidebarBtn || document.getElementById('toggleSidebarBtn');
 const sidebar = document.getElementById('sidebar');
 const closeSidebarBtn = document.getElementById('closeSidebarBtn');
 const sidebarBackdrop = document.getElementById('sidebarBackdrop');
@@ -117,8 +127,9 @@ function initTheme() {
   const savedTheme = localStorage.getItem('pdf_reader_theme') || 'default';
   applyTheme(savedTheme);
 
-  // Desktop theme buttons
-  themeButtons.forEach((btn) => {
+  // Desktop & flyout swatch theme buttons
+  const allThemeButtons = document.querySelectorAll('.theme-btn, .swatch-btn');
+  allThemeButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       const theme = btn.dataset.theme;
       applyTheme(theme);
@@ -142,7 +153,7 @@ function initTheme() {
 function applyTheme(theme) {
   document.body.className = `theme-${theme}`;
 
-  themeButtons.forEach((btn) => {
+  document.querySelectorAll('.theme-btn, .swatch-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.theme === theme);
   });
 
@@ -334,14 +345,12 @@ function renderRecentShelf() {
 
   if (list.length === 0) {
     shelfSection.style.display = 'none';
-    if (dropZoneTitle) dropZoneTitle.textContent = 'เปิดไฟล์ PDF เพื่อเริ่มอ่าน';
-    if (dropZoneSubtitle) dropZoneSubtitle.textContent = 'ลากไฟล์มาวางที่นี่ หรือกดปุ่มด้านล่างเพื่อเลือกไฟล์';
+    if (emptyShelf) emptyShelf.style.display = 'flex';
     return;
   }
 
   shelfSection.style.display = 'flex';
-  if (dropZoneTitle) dropZoneTitle.textContent = 'เปิดไฟล์เอกสารเล่มใหม่';
-  if (dropZoneSubtitle) dropZoneSubtitle.textContent = 'หรือลากไฟล์เล่มใหม่มาวางที่นี่เพื่อเปิดอ่าน';
+  if (emptyShelf) emptyShelf.style.display = 'none';
 
   recentGrid.innerHTML = '';
   list.forEach((item) => {
@@ -350,33 +359,24 @@ function renderRecentShelf() {
     card.title = `คลิกเพื่อเปิดอ่านต่อ (${item.name})`;
 
     card.innerHTML = `
-      <div class="recent-left">
-        <div class="recent-icon-badge">
-          <svg class="icon" viewBox="0 0 24 24">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
-        </div>
-        <div class="recent-meta">
-          <div class="recent-name">${item.name} ${item.isDrive ? '<span class="drive-badge">Drive</span>' : ''}</div>
+      <div class="recent-top">
+        <div class="recent-info">
+          <div class="recent-name" title="${item.name}">${item.name} ${item.isDrive ? '<span class="drive-badge">Drive</span>' : ''}</div>
           <div class="recent-sub">
-            <div class="recent-progress-bar">
-              <div class="recent-progress-fill" style="width: ${item.percentage}%"></div>
-            </div>
             <span>หน้า ${item.lastPage} / ${item.totalPages} (${item.percentage}%)</span>
             <span>•</span>
             <span>${formatRelativeTime(item.lastReadAt)}</span>
           </div>
         </div>
-      </div>
-      <div class="recent-right">
-        <button class="btn btn-text btn-primary" style="height: 30px; font-size: 12px; padding: 0 12px;">อ่านต่อ</button>
         <button class="recent-remove-btn" title="ลบออกจากประวัติ" aria-label="ลบ">
           <svg class="icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
+      </div>
+      <div class="recent-progress-bar">
+        <div class="recent-progress-fill" style="width: ${item.percentage}%"></div>
       </div>
     `;
 
@@ -415,6 +415,7 @@ function renderRecentShelf() {
     recentGrid.appendChild(card);
   });
 }
+
 
 // ==========================================================================
 // Sidebar & Tab Control (Drive-Style Drawer)
@@ -552,7 +553,12 @@ async function loadFile(file, targetPage = null) {
 
     dropZone.style.display = 'none';
     viewer.classList.add('active');
+    if (floatingCapsule) {
+      floatingCapsule.style.display = 'flex';
+      floatingCapsule.classList.remove('hidden');
+    }
     bottomBar.classList.add('visible');
+    bottomBar.classList.remove('hidden');
     if (shelfBtn) shelfBtn.style.display = 'inline-flex';
 
     calculateFitWidthScale();
@@ -952,14 +958,42 @@ async function renderOutlineItems(items, container, depth) {
 // Scroll Tracking & Local-First Sync
 // ==========================================================================
 
+let lastScrollTop = 0;
+const scrollDeltaThreshold = 8;
+
 viewerContainer.addEventListener('scroll', () => {
   if (!currentPdf || isJumpingToPage) return;
+
+  const currentScrollTop = viewerContainer.scrollTop;
+  const delta = currentScrollTop - lastScrollTop;
+
+  if (Math.abs(delta) > scrollDeltaThreshold) {
+    if (delta > 0 && currentScrollTop > 40) {
+      // Scrolling down -> hide floating capsule and bottom bar
+      if (floatingCapsule) floatingCapsule.classList.add('hidden');
+      if (bottomBar) bottomBar.classList.add('hidden');
+      if (typeof closeFlyoutMenu === 'function') closeFlyoutMenu();
+    } else if (delta < 0 || currentScrollTop < 40) {
+      // Scrolling up -> reveal floating capsule and bottom bar
+      if (floatingCapsule) floatingCapsule.classList.remove('hidden');
+      if (bottomBar) bottomBar.classList.remove('hidden');
+    }
+    lastScrollTop = currentScrollTop;
+  }
 
   clearTimeout(scrollTimer);
   scrollTimer = setTimeout(() => {
     if (isJumpingToPage) return;
     updateCurrentPageFromScroll();
   }, 60);
+});
+
+// Desktop top hover reveal
+document.addEventListener('mousemove', (e) => {
+  if (!currentPdf || dropZone.style.display !== 'none') return;
+  if (e.clientY <= 50) {
+    if (floatingCapsule) floatingCapsule.classList.remove('hidden');
+  }
 });
 
 function updateCurrentPageFromScroll() {
@@ -1237,9 +1271,10 @@ viewerContainer.addEventListener('touchend', (e) => {
       lastTapTime = now;
       setTimeout(() => {
         if (Date.now() - lastTapTime >= 320 && lastTapTime !== 0) {
-          if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'A') {
-            toolbar.classList.toggle('hidden');
-            bottomBar.classList.toggle('hidden');
+          if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'A' && !e.target.closest('#floatingCapsule') && !e.target.closest('#flyoutMenu')) {
+            if (floatingCapsule) floatingCapsule.classList.toggle('hidden');
+            if (bottomBar) bottomBar.classList.toggle('hidden');
+            closeFlyoutMenu();
           }
         }
       }, 320);
@@ -1315,15 +1350,73 @@ window.addEventListener('resize', () => {
   }, 180);
 });
 
+// Open Document Dropdown
+if (openDocBtn && openDocWrap) {
+  openDocBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openDocWrap.classList.toggle('open');
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (openDocWrap && !openDocWrap.contains(e.target)) {
+    openDocWrap.classList.remove('open');
+  }
+});
+
+// Flyout Menu Controls
+function openFlyoutMenu() {
+  if (flyoutMenu) flyoutMenu.classList.add('open');
+  if (flyoutBackdrop) flyoutBackdrop.classList.add('open');
+}
+
+function closeFlyoutMenu() {
+  if (flyoutMenu) flyoutMenu.classList.remove('open');
+  if (flyoutBackdrop) flyoutBackdrop.classList.remove('open');
+}
+
+function toggleFlyoutMenu() {
+  if (flyoutMenu && flyoutMenu.classList.contains('open')) {
+    closeFlyoutMenu();
+  } else {
+    openFlyoutMenu();
+  }
+}
+
+if (capsuleMenuBtn) {
+  capsuleMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleFlyoutMenu();
+  });
+}
+
+if (closeFlyoutBtn) closeFlyoutBtn.addEventListener('click', closeFlyoutMenu);
+if (flyoutBackdrop) flyoutBackdrop.addEventListener('click', closeFlyoutMenu);
+
+if (flyoutSidebarBtn) {
+  flyoutSidebarBtn.addEventListener('click', () => {
+    closeFlyoutMenu();
+    toggleSidebar();
+  });
+}
+
+if (flyoutSettingsBtn) {
+  flyoutSettingsBtn.addEventListener('click', () => {
+    closeFlyoutMenu();
+    openSettingsModal();
+  });
+}
+
 // Shelf and Recents controls
 if (shelfBtn) {
   shelfBtn.addEventListener('click', () => {
     dropZone.style.display = 'flex';
     viewer.classList.remove('active');
+    if (floatingCapsule) floatingCapsule.style.display = 'none';
     bottomBar.classList.remove('visible');
-    shelfBtn.style.display = 'none';
-    fileNameEl.textContent = 'ตู้หนังสือ';
-    fileNameEl.title = 'ตู้หนังสือ';
+    closeFlyoutMenu();
+    fileNameEl.textContent = 'คลังหนังสือ';
+    fileNameEl.title = 'คลังหนังสือ';
     renderRecentShelf();
     closeSidebar();
   });
