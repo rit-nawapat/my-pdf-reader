@@ -479,6 +479,115 @@ function renderRecentShelf() {
   });
 }
 
+// ==========================================================================
+// Google Drive Cloud Shelf Sync
+// Fetches files from Drive that have been read on ANY device and merges
+// them into the local shelf so the bookshelf stays in sync cross-device.
+// ==========================================================================
+
+let driveShelfSyncTimer = null;
+
+async function syncDriveShelf() {
+  const session = getSession();
+  if (!session || !session.token) return; // Only run when logged in
+
+  const token = session.token;
+
+  try {
+    // Query Drive for PDF files that have our appProperty written (lastReadPage)
+    // Using drive.file scope means we can only see files the app has opened before
+    const query = encodeURIComponent("mimeType='application/pdf' and trashed=false");
+    const fields = encodeURIComponent('files(id,name,size,modifiedTime,appProperties)');
+    const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&pageSize=50&orderBy=modifiedTime desc`;
+
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        // Token expired silently - don't disrupt user
+        console.info('[DriveSync] Token expired during shelf sync');
+      }
+      return;
+    }
+
+    const data = await resp.json();
+    const driveFiles = (data.files || []).filter(
+      (f) => f.appProperties && f.appProperties.lastReadPage
+    );
+
+    if (driveFiles.length === 0) return;
+
+    // Merge Drive files into local shelf (local always takes priority for same fileId)
+    const currentList = getRecentFiles();
+    const existingIds = new Set(currentList.map((item) => item.id));
+    let mergedCount = 0;
+
+    driveFiles.forEach((f) => {
+      const itemId = `pdf_drive_${f.id}`;
+      if (existingIds.has(itemId)) {
+        // Update lastPage from cloud (it may be newer from another device)
+        const localIdx = currentList.findIndex((item) => item.id === itemId);
+        if (localIdx >= 0) {
+          const cloudPage = parseInt(f.appProperties.lastReadPage, 10);
+          const localPage = currentList[localIdx].lastPage || 1;
+          if (cloudPage > 0 && cloudPage !== localPage) {
+            currentList[localIdx].lastPage = cloudPage;
+            currentList[localIdx].percentage = Math.min(
+              100,
+              Math.round((cloudPage / (currentList[localIdx].totalPages || 1)) * 100)
+            );
+            // Mark as synced from cloud (more recent)
+            currentList[localIdx].lastReadAt = f.modifiedTime || currentList[localIdx].lastReadAt;
+          }
+        }
+      } else {
+        // New file from Drive (read on another device) - add to shelf
+        const cloudPage = parseInt(f.appProperties.lastReadPage, 10) || 1;
+        currentList.unshift({
+          id: itemId,
+          name: f.name || 'เอกสาร Google Drive',
+          lastPage: cloudPage,
+          totalPages: 0, // Will be updated when opened
+          fileSize: parseInt(f.size, 10) || 0,
+          percentage: 0, // Unknown until opened (totalPages = 0)
+          isDrive: true,
+          driveFileId: f.id,
+          lastReadAt: f.modifiedTime || new Date().toISOString(),
+          fromCloudSync: true
+        });
+        mergedCount++;
+      }
+    });
+
+    // Sort by lastReadAt descending (most recently read first)
+    currentList.sort((a, b) => new Date(b.lastReadAt) - new Date(a.lastReadAt));
+
+    // Save the merged list back to localStorage
+    if (currentList.length > 12) currentList.splice(12);
+    localStorage.setItem(getProfileRecentKey(), JSON.stringify(currentList));
+
+    // Re-render the shelf to show newly synced files
+    renderRecentShelf();
+
+    if (mergedCount > 0) {
+      showToast(`🔄 ซิงค์คลังหนังสือจาก Drive: พบ ${mergedCount} ไฟล์ใหม่จากอุปกรณ์อื่น`);
+    }
+  } catch (err) {
+    console.warn('[DriveSync] Shelf sync failed:', err);
+  }
+}
+
+// Debounced trigger for Drive Shelf Sync (avoids double-calling)
+function triggerDriveShelfSync(delayMs = 1500) {
+  clearTimeout(driveShelfSyncTimer);
+  driveShelfSyncTimer = setTimeout(() => {
+    syncDriveShelf();
+  }, delayMs);
+}
+
+
 
 // ==========================================================================
 // Sidebar & Tab Control (Drive-Style Drawer)
@@ -2126,6 +2235,7 @@ function initGoogleClients() {
           updateAuthUI();
           renderRecentShelf();
           showToast(`ยินดีต้อนรับ ${userInfo.name || 'เข้าสู่ระบบสำเร็จ'}`);
+          triggerDriveShelfSync(2000); // Sync Drive bookshelf after login
 
           if (pendingAuthCallback) {
             const cb = pendingAuthCallback;
@@ -2352,6 +2462,15 @@ startSessionWatchdog();
 updateAuthUI();
 renderRecentShelf();
 setTimeout(initGoogleClients, 600);
+
+// Auto-sync Drive bookshelf on page load if user already has a valid session
+// (covers the case: opened on mobile, refresh on PC -> shelf syncs automatically)
+setTimeout(() => {
+  const existingSession = getSession();
+  if (existingSession && existingSession.token) {
+    triggerDriveShelfSync(1000);
+  }
+}, 2000);
 
 // ==========================================================================
 // PWA & Service Worker Manager (Add to Home Screen & Standalone Mode)
