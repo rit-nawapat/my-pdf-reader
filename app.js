@@ -1568,6 +1568,12 @@ if (openDocBtn && openDocWrap) {
   });
 }
 
+if (openDocMenu && openDocWrap) {
+  openDocMenu.addEventListener('click', () => {
+    openDocWrap.classList.remove('open');
+  });
+}
+
 document.addEventListener('click', (e) => {
   if (openDocWrap && !openDocWrap.contains(e.target)) {
     openDocWrap.classList.remove('open');
@@ -2130,6 +2136,8 @@ function initGoogleClients() {
 }
 
 function openGoogleDrivePicker() {
+  if (openDocWrap) openDocWrap.classList.remove('open');
+
   const cfg = getGdriveConfig();
   if (!cfg || !cfg.clientId || !cfg.apiKey) {
     showToast('กรุณากรอก Client ID และ API Key ก่อนใช้งาน');
@@ -2191,19 +2199,39 @@ function createAndShowPicker(apiKey, clientId) {
   }
 
   try {
-    const view = new google.picker.View(google.picker.ViewId.DOCS);
-    view.setMimeTypes('application/pdf');
+    // 1. Calculate responsive dimensions for mobile / tablet / desktop
+    const screenW = window.innerWidth || document.documentElement.clientWidth;
+    const screenH = window.innerHeight || document.documentElement.clientHeight;
+    const isMobile = screenW <= 640;
+
+    const pickerWidth = isMobile ? Math.max(300, Math.min(screenW - 20, 560)) : Math.min(screenW - 60, 780);
+    const pickerHeight = isMobile ? Math.max(400, Math.min(screenH - 30, 620)) : Math.min(screenH - 80, 560);
+
+    // 2. View configuration: PDF filter + folder navigation + clean list mode
+    const view = (google.picker.DocsView)
+      ? new google.picker.DocsView(google.picker.ViewId.DOCS)
+      : new google.picker.View(google.picker.ViewId.DOCS);
+
+    if (view.setMimeTypes) view.setMimeTypes('application/pdf');
+    if (view.setIncludeFolders) view.setIncludeFolders(true);
+    if (view.setMode && google.picker.DocsViewMode) {
+      view.setMode(google.picker.DocsViewMode.LIST);
+    }
 
     const appId = clientId.split('-')[0];
-    const picker = new google.picker.PickerBuilder()
+    const builder = new google.picker.PickerBuilder()
       .enableFeature(google.picker.Feature.NAV_HIDDEN)
       .setAppId(appId)
       .setOAuthToken(gdriveAccessToken)
       .addView(view)
       .addView(new google.picker.DocsUploadView())
       .setDeveloperKey(apiKey)
-      .setCallback(pickerCallback)
-      .build();
+      .setLocale('th')
+      .setTitle('เลือกไฟล์ PDF จาก Google Drive')
+      .setSize(pickerWidth, pickerHeight)
+      .setCallback(pickerCallback);
+
+    const picker = builder.build();
     picker.setVisible(true);
   } catch (err) {
     console.error('Picker create error:', err);
