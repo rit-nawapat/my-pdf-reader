@@ -1,0 +1,6 @@
+config.js
+config.json
+.env
+.env.local
+.DS_Store
+Thumbs.db
