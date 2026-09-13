@@ -434,12 +434,14 @@ function toggleSidebar() {
 function closeSidebar() {
   sidebar.classList.remove('open');
   sidebarBackdrop.classList.remove('active');
-  toggleSidebarBtn.classList.remove('active');
+  if (toggleSidebarBtn) toggleSidebarBtn.classList.remove('active');
 }
 
-toggleSidebarBtn.addEventListener('click', toggleSidebar);
-closeSidebarBtn.addEventListener('click', closeSidebar);
-sidebarBackdrop.addEventListener('click', closeSidebar);
+if (toggleSidebarBtn && toggleSidebarBtn !== flyoutSidebarBtn) {
+  toggleSidebarBtn.addEventListener('click', toggleSidebar);
+}
+if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeSidebar);
+if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
 
 tabThumbnails.addEventListener('click', () => {
   tabThumbnails.classList.add('active');
@@ -465,11 +467,10 @@ fileInput.addEventListener('change', (e) => {
   if (file && file.type === 'application/pdf') {
     const target = pendingTargetPage;
     pendingTargetPage = null;
+    if (openDocWrap) openDocWrap.classList.remove('open');
     loadFile(file, target);
   }
 });
-
-dropZoneOpenBtn.addEventListener('click', () => fileInput.click());
 
 ['dragenter', 'dragover'].forEach((eventName) => {
   window.addEventListener(eventName, (e) => {
