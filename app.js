@@ -2319,4 +2319,50 @@ updateAuthUI();
 renderRecentShelf();
 setTimeout(initGoogleClients, 600);
 
+// ==========================================================================
+// PWA & Service Worker Manager (Add to Home Screen & Standalone Mode)
+// ==========================================================================
+let deferredInstallPrompt = null;
+const pwaInstallDirectBtn = document.getElementById('pwaInstallDirectBtn');
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      console.log('[PWA] ServiceWorker registered with scope:', reg.scope);
+    }).catch((err) => {
+      console.warn('[PWA] ServiceWorker registration failed:', err);
+    });
+  });
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Prevent mini-infobar on Chrome mobile and store prompt
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (pwaInstallDirectBtn) {
+    pwaInstallDirectBtn.style.display = 'inline-flex';
+  }
+});
+
+if (pwaInstallDirectBtn) {
+  pwaInstallDirectBtn.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') {
+      showToast('กำลังเพิ่มแอปลงในหน้าจอหลัก...');
+    }
+    deferredInstallPrompt = null;
+    pwaInstallDirectBtn.style.display = 'none';
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  showToast('ติดตั้งแอปลงในหน้าจอหลักสำเร็จแล้ว!');
+  deferredInstallPrompt = null;
+  if (pwaInstallDirectBtn) {
+    pwaInstallDirectBtn.style.display = 'none';
+  }
+});
+
 

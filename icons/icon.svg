@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#181a1c" stroke="#374151" stroke-width="8"/>
+  <rect x="110" y="90" width="292" height="332" rx="28" fill="#23272f" stroke="#4b5563" stroke-width="6"/>
+  <!-- Document Accent Lines -->
+  <rect x="160" y="160" width="192" height="14" rx="7" fill="#3b82f6"/>
+  <rect x="160" y="210" width="192" height="14" rx="7" fill="#94a3b8"/>
+  <rect x="160" y="260" width="128" height="14" rx="7" fill="#94a3b8"/>
+  <!-- PDF Badge -->
+  <rect x="250" y="320" width="162" height="82" rx="20" fill="#ef4444"/>
+  <text x="331" y="378" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="bold" text-anchor="middle">PDF</text>
+</svg>

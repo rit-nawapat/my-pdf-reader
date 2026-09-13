@@ -7,7 +7,12 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDF Reader">
   <title>Minimal PDF Reader</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
   <!-- PDF.js CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -401,6 +406,28 @@
               <span>คัดลอกลิงก์ส่งเข้า LINE / โน้ต</span>
             </button>
           </div>
+        </div>
+
+        <!-- PWA / Add to Home Screen Section -->
+        <div class="pwa-install-section" id="pwaInstallSection">
+          <div class="sync-divider">
+            <span>📱 ใช้งานแบบแอปบนมือถือ (ซ่อนแถบ URL)</span>
+          </div>
+          <p class="sync-desc">เพิ่มเป็นแอปลงในหน้าจอมือถือเพื่อเปิดอ่านเต็มจอ ไม่มีแถบที่อยู่เว็บกวนใจ:</p>
+          <div class="pwa-guide-box">
+            <div class="pwa-guide-step">
+              <span class="pwa-badge">Android</span>
+              <span>แตะจุดสามจุด <strong class="badge-key">⋮</strong> ด้านบนขวา &rarr; เลือก <strong>"เพิ่มลงในหน้าจอหลัก"</strong> หรือ <strong>"ติดตั้งแอป"</strong></span>
+            </div>
+            <div class="pwa-guide-step">
+              <span class="pwa-badge">iOS / Safari</span>
+              <span>แตะปุ่มแชร์ <strong class="badge-key">⎋</strong> ด้านล่าง &rarr; เลือก <strong>"เพิ่มไปยังหน้าจอโฮม"</strong></span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-small" id="pwaInstallDirectBtn" style="display: none;">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>กดเพื่อติดตั้งแอปลงในเครื่องทันที</span>
+          </button>
         </div>
       </div>
 
