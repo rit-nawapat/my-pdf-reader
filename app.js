@@ -1574,6 +1574,12 @@ if (openDocMenu && openDocWrap) {
   });
 }
 
+document.addEventListener('pointerdown', (e) => {
+  if (openDocWrap && !openDocWrap.contains(e.target)) {
+    openDocWrap.classList.remove('open');
+  }
+});
+
 document.addEventListener('click', (e) => {
   if (openDocWrap && !openDocWrap.contains(e.target)) {
     openDocWrap.classList.remove('open');
