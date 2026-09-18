@@ -54,7 +54,7 @@ body.theme-sepia {
   --canvas-filter: sepia(0.38) contrast(0.93) brightness(0.96);
 }
 
-/* Dark Theme */
+/* Dark Theme (UI only - pages stay unfiltered unless page-invert is on) */
 body.theme-dark {
   --bg-app: #111214;
   --bg-toolbar: #16171a;
@@ -64,6 +64,10 @@ body.theme-dark {
   --border-color: rgba(255, 255, 255, 0.06);
   --text-main: #e8eaed;
   --text-muted: #8c9298;
+}
+
+/* Explicit opt-in page inversion (dark-room reading; illustrations invert too) */
+body.page-invert {
   --canvas-filter: invert(0.9) hue-rotate(180deg) contrast(0.95) brightness(0.92);
 }
 
@@ -286,7 +290,8 @@ html, body {
 
 .floating-capsule {
   position: fixed;
-  top: calc(14px + env(safe-area-inset-top, 0));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0));
+  top: auto;
   left: 50%;
   transform: translateX(-50%);
   height: 44px;
@@ -319,7 +324,7 @@ body.theme-dark .floating-capsule {
 }
 
 .floating-capsule.hidden {
-  transform: translateX(-50%) translateY(-140%);
+  transform: translateX(-50%) translateY(140%);
   opacity: 0;
   pointer-events: none;
 }
@@ -350,6 +355,8 @@ body.theme-dark .floating-capsule {
 }
 
 .capsule-title {
+  /* Hidden by design: capsule shows navigation controls only */
+  display: none;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-muted);
@@ -432,7 +439,7 @@ body.theme-dark .capsule-nav {
 
 .flyout-menu {
   position: fixed;
-  bottom: calc(20px + env(safe-area-inset-bottom, 0));
+  bottom: calc(76px + env(safe-area-inset-bottom, 0));
   left: 50%;
   transform: translateX(-50%) translateY(120%);
   width: min(340px, calc(100vw - 32px));
@@ -584,6 +591,64 @@ body.theme-dark .flyout-menu {
 
 .flyout-zoom-group .btn:hover {
   background: var(--bg-hover);
+}
+
+/* Flyout fast page seek (accessible replacement for the retired scrubber) */
+.flyout-seek-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+}
+
+.flyout-slider {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  accent-color: var(--primary-color, #7aa2f7);
+  cursor: pointer;
+  background: transparent;
+}
+
+.flyout-seek-label {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.flyout-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-main);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.flyout-toggle-row small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.flyout-toggle-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary-color, #3b82f6);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.flyout-hint {
+  font-size: 11px;
+  color: var(--text-subtle, #6b7280);
+  margin: 8px 0 0 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .flyout-actions {
@@ -1320,6 +1385,9 @@ body.theme-dark .flyout-menu {
    ========================================================================== */
 
 .floating-mini-scrubber {
+  /* Retired: replaced by the bottom capsule toolbar. Kept in DOM only
+     so legacy JS class toggles stay harmless. */
+  display: none !important;
   position: fixed;
   bottom: calc(20px + env(safe-area-inset-bottom, 0));
   left: 50%;
@@ -1452,7 +1520,7 @@ body.theme-dark .floating-mini-scrubber {
 /* Toast */
 .toast {
   position: fixed;
-  bottom: calc(54px + env(safe-area-inset-bottom, 0));
+  bottom: calc(84px + env(safe-area-inset-bottom, 0));
   left: 50%;
   transform: translateX(-50%) translateY(20px);
   background: rgba(26, 28, 30, 0.95);
@@ -1504,7 +1572,8 @@ body.theme-dark .floating-mini-scrubber {
 
   /* Zen Floating Capsule on Mobile */
   .floating-capsule {
-    top: max(10px, env(safe-area-inset-top, 10px));
+    bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    top: auto;
     width: calc(100vw - 16px);
     max-width: 440px;
     padding: 4px 6px;
@@ -1954,6 +2023,19 @@ body.theme-dark .floating-mini-scrubber {
   border-radius: 4px;
   font-size: 11px;
   color: #8ab4f8;
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+.local-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
   font-weight: 500;
   margin-left: 6px;
 }
@@ -2572,6 +2654,89 @@ body.theme-light .pwa-guide-box {
   .picker-modal-dialog {
     border-radius: 14px !important;
     max-width: calc(100vw - 16px) !important;
+  }
+}
+
+/* ==========================================================================
+   Resume Card (fresh launch: continue last book explicitly)
+   ========================================================================== */
+
+.resume-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(30, 32, 35, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+}
+
+.resume-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.resume-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--primary-color, #7aa2f7);
+}
+
+.resume-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 46vw;
+}
+
+.resume-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.resume-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .resume-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .resume-name {
+    max-width: 100%;
+  }
+  .resume-actions .btn {
+    flex: 1;
+  }
+}
+
+/* ==========================================================================
+   Reduced motion: honor OS accessibility preference
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
