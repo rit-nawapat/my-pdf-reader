@@ -46,7 +46,7 @@ const flyoutMenu = document.getElementById('flyoutMenu');
 const flyoutBackdrop = document.getElementById('flyoutBackdrop');
 const closeFlyoutBtn = document.getElementById('closeFlyoutBtn');
 const flyoutSidebarBtn = document.getElementById('flyoutSidebarBtn');
-const flyoutSettingsBtn = document.getElementById('flyoutSettingsBtn');
+const flyoutInstallBtn = document.getElementById('flyoutInstallBtn');
 
 // DOM Elements - Shelf / Recent Files
 const shelfBtn = document.getElementById('shelfBtn');
@@ -86,17 +86,13 @@ let resizeTimer = null;
 let isJumpingToPage = false;
 let pendingTargetPage = null;
 
-// DOM Elements - Google Drive & Settings Modal
+// DOM Elements - Google Drive Open Buttons & Install App Modal
 const driveOpenBtn = document.getElementById('driveOpenBtn');
 const dropZoneDriveBtn = document.getElementById('dropZoneDriveBtn');
-const openSettingsBtn = document.getElementById('openSettingsBtn');
-const settingsModal = document.getElementById('settingsModal');
-const closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
-const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
-const saveConfigBtn = document.getElementById('saveConfigBtn');
-const clearConfigBtn = document.getElementById('clearConfigBtn');
-const cfgClientIdInput = document.getElementById('cfgClientId');
-const cfgApiKeyInput = document.getElementById('cfgApiKey');
+const openInstallBtn = document.getElementById('openInstallBtn');
+const installModal = document.getElementById('installModal');
+const closeInstallModalBtn = document.getElementById('closeInstallModalBtn');
+const closeInstallBtn = document.getElementById('closeInstallBtn');
 
 // Google Drive State Variables (Zero-hardcoded secrets)
 const GDRIVE_CONFIG_KEY = 'pdf_reader_gdrive_config';
@@ -1737,10 +1733,10 @@ if (flyoutSidebarBtn) {
   });
 }
 
-if (flyoutSettingsBtn) {
-  flyoutSettingsBtn.addEventListener('click', () => {
+if (flyoutInstallBtn) {
+  flyoutInstallBtn.addEventListener('click', () => {
     closeFlyoutMenu();
-    openSettingsModal();
+    openInstallModal();
   });
 }
 
@@ -1764,7 +1760,7 @@ if (clearRecentsBtn) {
 }
 
 // ==========================================================================
-// Google Drive & In-App Credentials Manager (Zero-Hardcode Security)
+// Google Drive Config (auto-injected at build time via GitHub Secrets)
 // ==========================================================================
 
 function getGdriveConfig() {
@@ -1781,167 +1777,28 @@ function getGdriveConfig() {
   }
 }
 
-function saveGdriveConfig(clientId, apiKey) {
-  const cfg = {
-    clientId: (clientId || '').trim(),
-    apiKey: (apiKey || '').trim()
-  };
-  localStorage.setItem(GDRIVE_CONFIG_KEY, JSON.stringify(cfg));
-  initGoogleClients();
-  return cfg;
+// ==========================================================================
+// Install App Modal (PWA: Add to Home Screen)
+// ==========================================================================
+
+function openInstallModal() {
+  if (!installModal) return;
+  installModal.classList.add('open');
+  installModal.setAttribute('aria-hidden', 'false');
 }
 
-function clearGdriveConfig() {
-  localStorage.removeItem(GDRIVE_CONFIG_KEY);
-  gdriveAccessToken = null;
-  tokenClient = null;
-  gisInited = false;
-  const mobileSyncSection = document.getElementById('mobileSyncSection');
-  if (mobileSyncSection) mobileSyncSection.style.display = 'none';
-  showToast('ล้างข้อมูลกุญแจ Google Drive ในเครื่องแล้ว');
+function closeInstallModal() {
+  if (!installModal) return;
+  installModal.classList.remove('open');
+  installModal.setAttribute('aria-hidden', 'true');
 }
 
-let qrCodeInstance = null;
-function updateMobileSyncQR(cfg) {
-  const mobileSyncSection = document.getElementById('mobileSyncSection');
-  const qrContainer = document.getElementById('qrcode');
-  if (!mobileSyncSection || !qrContainer) return;
-
-  if (!cfg || !cfg.clientId || !cfg.apiKey) {
-    mobileSyncSection.style.display = 'none';
-    return;
-  }
-
-  // Generate URL with encoded setup payload
-  const payload = btoa(encodeURIComponent(JSON.stringify({ clientId: cfg.clientId, apiKey: cfg.apiKey })));
-  const syncUrl = `${window.location.origin}${window.location.pathname}#setup=${payload}`;
-
-  mobileSyncSection.style.display = 'flex';
-  qrContainer.innerHTML = '';
-
-  if (typeof QRCode !== 'undefined') {
-    try {
-      qrCodeInstance = new QRCode(qrContainer, {
-        text: syncUrl,
-        width: 160,
-        height: 160,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
-      });
-    } catch (e) {
-      console.warn('QR Code generation warning:', e);
-    }
-  }
-
-  const copySyncLinkBtn = document.getElementById('copySyncLinkBtn');
-  if (copySyncLinkBtn) {
-    copySyncLinkBtn.onclick = () => {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(syncUrl).then(() => {
-          showToast('คัดลอกลิงก์ตั้งค่าแล้ว! ส่งเข้า LINE หรือเปิดบนมือถือได้เลย');
-        }).catch(() => {
-          prompt('คัดลอกลิงก์ด้านล่างเพื่อเปิดบนมือถือ:', syncUrl);
-        });
-      } else {
-        prompt('คัดลอกลิงก์ด้านล่างเพื่อเปิดบนมือถือ:', syncUrl);
-      }
-    };
-  }
-}
-
-function checkUrlSetup() {
-  if (window.location.hash && window.location.hash.startsWith('#setup=')) {
-    try {
-      const raw = decodeURIComponent(atob(window.location.hash.replace('#setup=', '')));
-      const parsed = JSON.parse(raw);
-      if (parsed.clientId && parsed.apiKey) {
-        saveGdriveConfig(parsed.clientId, parsed.apiKey);
-        showToast('ตั้งค่า Google Drive สำเร็จแล้ว! พร้อมใช้งานบนมือถือ');
-        // Clean URL immediately so hash doesn't linger in browser history
-        if (window.history && window.history.replaceState) {
-          window.history.replaceState(null, '', window.location.pathname + window.location.search);
-        } else {
-          window.location.hash = '';
-        }
-      }
-    } catch (e) {
-      console.warn('URL setup parse error:', e);
-    }
-  }
-}
-
-function openSettingsModal() {
-  const cfg = getGdriveConfig();
-  if (cfg) {
-    cfgClientIdInput.value = cfg.clientId || '';
-    cfgApiKeyInput.value = cfg.apiKey || '';
-    updateMobileSyncQR(cfg);
-  } else {
-    cfgClientIdInput.value = '';
-    cfgApiKeyInput.value = '';
-    const mobileSyncSection = document.getElementById('mobileSyncSection');
-    if (mobileSyncSection) mobileSyncSection.style.display = 'none';
-  }
-  settingsModal.classList.add('open');
-  settingsModal.setAttribute('aria-hidden', 'false');
-}
-
-function closeSettingsModal() {
-  settingsModal.classList.remove('open');
-  settingsModal.setAttribute('aria-hidden', 'true');
-}
-
-// Password visibility toggle
-document.querySelectorAll('.btn-toggle-pw').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const targetId = btn.dataset.target;
-    const input = document.getElementById(targetId);
-    if (input) {
-      const isPassword = input.type === 'password';
-      input.type = isPassword ? 'text' : 'password';
-      btn.style.color = isPassword ? 'var(--primary-color)' : '';
-    }
-  });
-});
-
-if (openSettingsBtn) openSettingsBtn.addEventListener('click', openSettingsModal);
-if (closeSettingsModalBtn) closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
-if (cancelSettingsBtn) cancelSettingsBtn.addEventListener('click', closeSettingsModal);
-if (settingsModal) {
-  settingsModal.addEventListener('click', (e) => {
-    if (e.target === settingsModal) closeSettingsModal();
-  });
-}
-
-if (clearConfigBtn) {
-  clearConfigBtn.addEventListener('click', () => {
-    if (confirm('ต้องการล้างกุญแจ Google Drive ออกจากเครื่องนี้หรือไม่?')) {
-      clearGdriveConfig();
-      cfgClientIdInput.value = '';
-      cfgApiKeyInput.value = '';
-      closeSettingsModal();
-    }
-  });
-}
-
-if (saveConfigBtn) {
-  saveConfigBtn.addEventListener('click', () => {
-    const clientId = cfgClientIdInput.value.trim();
-    const apiKey = cfgApiKeyInput.value.trim();
-
-    if (!clientId || !apiKey) {
-      showToast('กรุณากรอกทั้ง Client ID และ API Key ให้ครบถ้วน');
-      return;
-    }
-
-    const saved = saveGdriveConfig(clientId, apiKey);
-    updateMobileSyncQR(saved);
-    closeSettingsModal();
-    showToast('บันทึกกุญแจสำเร็จ กำลังเชื่อมต่อ Google Drive...');
-    setTimeout(() => {
-      openGoogleDrivePicker();
-    }, 400);
+if (openInstallBtn) openInstallBtn.addEventListener('click', openInstallModal);
+if (closeInstallModalBtn) closeInstallModalBtn.addEventListener('click', closeInstallModal);
+if (closeInstallBtn) closeInstallBtn.addEventListener('click', closeInstallModal);
+if (installModal) {
+  installModal.addEventListener('click', (e) => {
+    if (e.target === installModal) closeInstallModal();
   });
 }
 
@@ -2170,8 +2027,7 @@ function handleSignInClick() {
   closeProfilePopover();
   const cfg = getGdriveConfig();
   if (!cfg || !cfg.clientId) {
-    showToast('กรุณากรอก Client ID ในหน้าตั้งค่าก่อนเข้าสู่ระบบ');
-    openSettingsModal();
+    showToast('Google Drive ยังไม่พร้อมใช้งานบนอุปกรณ์นี้');
     return;
   }
   if (!tokenClient || !gisInited) {
@@ -2261,8 +2117,7 @@ function openGoogleDrivePicker() {
 
   const cfg = getGdriveConfig();
   if (!cfg || !cfg.clientId || !cfg.apiKey) {
-    showToast('กรุณากรอก Client ID และ API Key ก่อนใช้งาน');
-    openSettingsModal();
+    showToast('Google Drive ยังไม่พร้อมใช้งานบนอุปกรณ์นี้');
     return;
   }
 
@@ -2573,8 +2428,6 @@ async function uploadLocalToDrive(file, pageToOpen) {
 }
 
 // Boot
-checkUrlSetup();
-window.addEventListener('hashchange', checkUrlSetup);
 initTheme();
 initActivityListeners();
 startSessionWatchdog();

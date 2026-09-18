@@ -19,8 +19,6 @@
   <!-- Google Identity Services & Google API Client for Picker -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://apis.google.com/js/api.js" async defer></script>
-  <!-- Lightweight QR Code generator for 1-click mobile sync -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- Optional Local Config (Ignored in .gitignore) -->
   <script src="config.js" onerror="/* optional */"></script>
 </head>
@@ -102,9 +100,9 @@
         <svg class="icon" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
         <span>เต็มหน้าจอ</span>
       </button>
-      <button class="flyout-action-item" id="flyoutSettingsBtn">
-        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-        <span>ตั้งค่า Google Drive</span>
+      <button class="flyout-action-item" id="flyoutInstallBtn">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <span>ติดตั้งแอปลงมือถือ</span>
       </button>
     </div>
   </div>
@@ -287,9 +285,9 @@
                 </div>
               </div>
 
-              <!-- Settings Button -->
-              <button class="btn btn-icon library-settings-btn" id="openSettingsBtn" title="ตั้งค่า Google Drive">
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <!-- Install App Button -->
+              <button class="btn btn-icon library-settings-btn" id="openInstallBtn" title="ติดตั้งแอปลงมือถือ">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               </button>
             </div>
           </div>
@@ -334,19 +332,19 @@
   <!-- Invisible backdrop to catch outside clicks for profile dropdown -->
   <div class="profile-backdrop" id="profileBackdrop" style="display: none;"></div>
 
-  <!-- Google Drive Credentials Settings Modal (Zero-Hardcode: Browser-only storage) -->
-  <div class="modal-backdrop" id="settingsModal" aria-hidden="true">
+  <!-- Install App Modal (PWA: Add to Home Screen) -->
+  <div class="modal-backdrop" id="installModal" aria-hidden="true">
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <svg class="icon icon-drive" viewBox="0 0 24 24" style="width: 22px; height: 22px;">
-            <path fill="#4285F4" d="M12.01 1.49L4.47 14.54l3.75 6.49 7.54-13.05z" />
-            <path fill="#0F9D58" d="M4.47 14.54L.72 21.03h15.08l3.75-6.49z" />
-            <path fill="#FFBB00" d="M19.55 14.54L15.8 8.05H8.22l3.75 6.49z" />
+          <svg class="icon" viewBox="0 0 24 24" style="width: 22px; height: 22px;">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
-          <h3 class="modal-title">ตั้งค่าการเชื่อมต่อ Google Drive</h3>
+          <h3 class="modal-title">ติดตั้งแอปลงมือถือ</h3>
         </div>
-        <button class="btn btn-icon modal-close-btn" id="closeSettingsModalBtn" title="ปิด" aria-label="ปิด">
+        <button class="btn btn-icon modal-close-btn" id="closeInstallModalBtn" title="ปิด" aria-label="ปิด">
           <svg class="icon" viewBox="0 0 24 24">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -355,58 +353,6 @@
       </div>
 
       <div class="modal-body">
-        <div class="security-notice">
-          <svg class="icon" viewBox="0 0 24 24">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-          </svg>
-          <p><strong>ความปลอดภัยสูงสุด (Zero-Hardcode):</strong> ข้อมูลกุญแจทั้งหมดจะถูกจัดเก็บไว้ในเบราว์เซอร์ของเครื่องนี้เท่านั้น ไม่มีการฝังไว้ในไฟล์โค้ด และไม่ส่งไปยังเซิร์ฟเวอร์ใดๆ</p>
-        </div>
-
-        <div class="form-group">
-          <label for="cfgClientId">OAuth Client ID</label>
-          <div class="input-wrap">
-            <input type="password" id="cfgClientId" placeholder="เช่น 123456-xxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false">
-            <button type="button" class="btn btn-icon btn-toggle-pw" data-target="cfgClientId" title="แสดง/ซ่อน">
-              <svg class="icon icon-eye" viewBox="0 0 24 24">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="cfgApiKey">Google API Key</label>
-          <div class="input-wrap">
-            <input type="password" id="cfgApiKey" placeholder="เช่น AIzaSy..." autocomplete="off" spellcheck="false">
-            <button type="button" class="btn btn-icon btn-toggle-pw" data-target="cfgApiKey" title="แสดง/ซ่อน">
-              <svg class="icon icon-eye" viewBox="0 0 24 24">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- 1-Click Mobile Setup via QR Code or Link -->
-        <div class="mobile-sync-section" id="mobileSyncSection" style="display: none;">
-          <div class="sync-divider">
-            <span>ส่งต่อการตั้งค่าเข้ามือถือ (ไม่ต้องพิมพ์)</span>
-          </div>
-          <p class="sync-desc">สแกน QR Code นี้ด้วยกล้องมือถือ เพื่อตั้งค่าและเปิดอ่านบนมือถือได้ทันที:</p>
-          <div class="qr-container" id="qrContainer">
-            <div id="qrcode"></div>
-          </div>
-          <div class="sync-actions">
-            <button type="button" class="btn btn-secondary btn-small" id="copySyncLinkBtn">
-              <svg class="icon" viewBox="0 0 24 24">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-              <span>คัดลอกลิงก์ส่งเข้า LINE / โน้ต</span>
-            </button>
-          </div>
-        </div>
 
         <!-- PWA / Add to Home Screen Section -->
         <div class="pwa-install-section" id="pwaInstallSection">
@@ -432,10 +378,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-text text-danger" id="clearConfigBtn">ล้างข้อมูลในเครื่อง</button>
         <div class="modal-footer-actions">
-          <button class="btn btn-secondary" id="cancelSettingsBtn">ยกเลิก</button>
-          <button class="btn btn-primary" id="saveConfigBtn">บันทึกและเชื่อมต่อ</button>
+          <button class="btn btn-secondary" id="closeInstallBtn">ปิด</button>
         </div>
       </div>
     </div>
