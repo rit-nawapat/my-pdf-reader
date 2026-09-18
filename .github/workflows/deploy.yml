@@ -29,12 +29,25 @@ jobs:
             echo "window.GDRIVE_CONFIG = { clientId: '', apiKey: '' };" > config.js
             echo "::warning::GDRIVE_CLIENT_ID / GDRIVE_API_KEY secrets missing - site will run without Google Drive"
           else
+            # Strip any BOM/whitespace sneaked into secrets, then write UTF-8
+            CLIENT_ID=$(printf '%s' "$GDRIVE_CLIENT_ID" | tr -d '\357\273\277\r\n' | xargs)
+            API_KEY=$(printf '%s' "$GDRIVE_API_KEY" | tr -d '\357\273\277\r\n' | xargs)
             printf 'window.GDRIVE_CONFIG = {\n  clientId: "%s",\n  apiKey: "%s"\n};\n' \
-              "$GDRIVE_CLIENT_ID" "$GDRIVE_API_KEY" > config.js
+              "$CLIENT_ID" "$API_KEY" > config.js
             echo "config.js generated from secrets"
+            echo "clientId starts with: ${CLIENT_ID:0:4}... length: ${#CLIENT_ID}"
           fi
-          # sanity check: fail build if the file is not valid JS
+          # sanity check: valid JS AND no BOM left in values
           node --check config.js
+          node -e "const c=require('./config.js'.replace(/^/,process.cwd()+'/'));" 2>/dev/null || true
+          node -e "
+            const fs=require('fs');
+            const s=fs.readFileSync('config.js','utf8');
+            if (/[\uFEFF]/.test(s.replace(/^\uFEFF/,''))) throw new Error('BOM inside values');
+            const m=s.match(/clientId:\s*\"([^\"]*)\"/);
+            if (!m||!/^[a-z0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/.test(m[1])) throw new Error('clientId malformed: '+JSON.stringify(m&&m[1]));
+            console.log('config sanity OK');
+          "
 
       - name: Assemble site
         run: |

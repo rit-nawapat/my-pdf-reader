@@ -2312,12 +2312,24 @@ if (clearRecentsBtn) {
 function getGdriveConfig() {
   // 1. Check optional window.GDRIVE_CONFIG (e.g. from ignored local config.js)
   if (typeof window !== 'undefined' && window.GDRIVE_CONFIG && window.GDRIVE_CONFIG.clientId && window.GDRIVE_CONFIG.apiKey) {
-    return window.GDRIVE_CONFIG;
+    // Sanitize (defence-in-depth): a BOM/ZWSP inside a pasted value makes
+    // Google's token client hang forever with zero feedback.
+    const raw = window.GDRIVE_CONFIG;
+    const clean = {
+      clientId: String(raw.clientId).replace(/[\uFEFF\u200B-\u200D\s]/g, ''),
+      apiKey: String(raw.apiKey).replace(/[\uFEFF\u200B-\u200D\s]/g, '')
+    };
+    if (clean.clientId && clean.apiKey) return clean;
   }
   // 2. Check localStorage
   try {
-    const raw = localStorage.getItem(GDRIVE_CONFIG_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const stored = localStorage.getItem(GDRIVE_CONFIG_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    return {
+      clientId: String(parsed.clientId || '').replace(/[\uFEFF\u200B-\u200D\s]/g, ''),
+      apiKey: String(parsed.apiKey || '').replace(/[\uFEFF\u200B-\u200D\s]/g, '')
+    };
   } catch (e) {
     return null;
   }
@@ -2593,6 +2605,11 @@ function initGoogleClients() {
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: cfg.clientId,
         scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid',
+        error_callback: (err) => {
+          // Fires when popup blocked/closed without completing consent
+          console.warn('[Auth] GIS error_callback:', err);
+          showToast('หน้าต่าง Google ถูกปิดหรือถูกบล็อก ลองเข้าสู่ระบบใหม่อีกครั้ง');
+        },
         callback: async (resp) => {
           if (resp.error !== undefined) {
             console.error('GIS Error:', resp);
