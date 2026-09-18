@@ -1,0 +1,54 @@
+name: Deploy PDF Reader (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate config.js at build time (values never committed)
+        env:
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_API_KEY: ${{ secrets.GDRIVE_API_KEY }}
+        run: |
+          if [ -z "$GDRIVE_CLIENT_ID" ] || [ -z "$GDRIVE_API_KEY" ]; then
+            echo "window.GDRIVE_CONFIG = { clientId: '', apiKey: '' };" > config.js
+            echo "::warning::GDRIVE_CLIENT_ID / GDRIVE_API_KEY secrets missing - site will run without Google Drive"
+          else
+            printf 'window.GDRIVE_CONFIG = {\n  clientId: "%s",\n  apiKey: "%s"\n};\n' \
+              "$GDRIVE_CLIENT_ID" "$GDRIVE_API_KEY" > config.js
+            echo "config.js generated from secrets"
+          fi
+          # sanity check: fail build if the file is not valid JS
+          node --check config.js
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'docs' --exclude '.superpowers' --exclude 'config.json' --exclude 'config.local.*' . _site/
+          ls -la _site/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

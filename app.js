@@ -765,8 +765,13 @@ async function loadFile(file, targetPage = null) {
       driveFileId: currentDriveFileId
     });
 
-    if (currentDriveFileId && gdriveAccessToken) {
-      debounceSyncDrivePage(currentDriveFileId, pageToOpen);
+    if (currentDriveFileId) {
+      if (gdriveAccessToken) {
+        debounceSyncDrivePage(currentDriveFileId, pageToOpen);
+      }
+    } else {
+      // Local file: upload to Drive (if signed in) so other devices can see it
+      uploadLocalToDrive(file, pageToOpen);
     }
 
     // Jump directly to the target page
@@ -2453,6 +2458,120 @@ function debounceSyncDrivePage(fileId, pageNum) {
   }, 1500);
 }
 
+// ==========================================================================
+// Upload Local Files to Google Drive (Cross-Device for locally opened PDFs)
+// Locally opened files are stored only on the current device. To make the
+// bookshelf + reading position sync cross-device, we upload the file to the
+// user's Drive once (deduped by name + marker appProperty), then reuse the
+// existing appProperties page-sync pipeline.
+// ==========================================================================
+
+let localUploadInFlight = new Set(); // file keys currently being uploaded
+
+async function getDriveToken() {
+  if (gdriveAccessToken) return gdriveAccessToken;
+  const session = getSession();
+  return session && session.token ? session.token : null;
+}
+
+// Find an app-managed copy of the file in Drive, or upload it once.
+async function findOrCreateDriveFile(file, token) {
+  // 1) Search for our app-managed copy (marker appProperty prevents matching
+  //    the user's unrelated PDFs that happen to share the same name)
+  const safeName = file.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const query = encodeURIComponent(
+    `name='${safeName}' and mimeType='application/pdf' and trashed=false`
+  );
+  const fields = encodeURIComponent('files(id,name,appProperties)');
+  const searchResp = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&pageSize=10`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (searchResp.ok) {
+    const data = await searchResp.json();
+    const match = (data.files || []).find(
+      (f) => f.appProperties && f.appProperties.pdfReaderLocal === '1'
+    );
+    if (match) return match.id;
+  } else if (searchResp.status === 401) {
+    showToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อซิงค์ไฟล์');
+    return null;
+  }
+
+  // 2) Not found -> upload once (multipart) with marker appProperty
+  const metadata = {
+    name: file.name,
+    mimeType: 'application/pdf',
+    appProperties: { pdfReaderLocal: '1' }
+  };
+  const form = new FormData();
+  form.append(
+    'metadata',
+    new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+  );
+  form.append('file', file);
+
+  const uploadResp = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form
+    }
+  );
+
+  if (!uploadResp.ok) {
+    if (uploadResp.status === 401) {
+      showToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อซิงค์ไฟล์');
+    }
+    throw new Error(`อัปโหลดไฟล์ไม่สำเร็จ (HTTP ${uploadResp.status})`);
+  }
+
+  const uploaded = await uploadResp.json();
+  return uploaded.id;
+}
+
+// Called after a locally-opened file renders. Silently no-ops when not
+// signed in (user keeps local-only behavior).
+async function uploadLocalToDrive(file, pageToOpen) {
+  const token = await getDriveToken();
+  if (!token || !file) return; // not signed in -> stay local-only
+
+  const uploadKey = currentFileKey;
+  if (localUploadInFlight.has(uploadKey)) return;
+  localUploadInFlight.add(uploadKey);
+
+  try {
+    const driveFileId = await findOrCreateDriveFile(file, token);
+    if (!driveFileId) return;
+
+    // Promote this reading session to a Drive-backed one
+    currentDriveFileId = driveFileId;
+
+    // Update the shelf entry so it syncs and reopens via Drive elsewhere
+    const list = getRecentFiles();
+    const entry = list.find((item) => item.id === currentFileKey);
+    if (entry) {
+      entry.isDrive = true;
+      entry.driveFileId = driveFileId;
+      entry.lastReadAt = new Date().toISOString();
+    }
+    localStorage.setItem(getProfileRecentKey(), JSON.stringify(list));
+    renderRecentShelf();
+
+    // Sync current reading position to the uploaded copy
+    debounceSyncDrivePage(driveFileId, pageToOpen);
+    triggerDriveShelfSync(500);
+
+    showToast('🔗 อัปโหลดไฟล์ขึ้น Drive แล้ว จะเปิดอ่านต่อได้จากอุปกรณ์อื่น');
+  } catch (err) {
+    console.warn('[DriveUpload] Local file upload failed:', err);
+  } finally {
+    localUploadInFlight.delete(uploadKey);
+  }
+}
+
 // Boot
 checkUrlSetup();
 window.addEventListener('hashchange', checkUrlSetup);
@@ -2471,6 +2590,37 @@ setTimeout(() => {
     triggerDriveShelfSync(1000);
   }
 }, 2000);
+
+// Silent auto-connect: if config is loaded (config.js) and the user has
+// logged in before on this device (session expired), reconnect automatically
+// on the first user interaction. Google returns the token silently when
+// consent was already granted - no settings or button press needed.
+let silentConnectAttempted = false;
+async function attemptSilentConnect() {
+  if (silentConnectAttempted) return;
+  silentConnectAttempted = true;
+
+  const session = getSession();
+  if (session && session.token) return; // already connected
+
+  const cfg = getGdriveConfig();
+  if (!cfg || !cfg.clientId) return;
+
+  if (!tokenClient || !gisInited) initGoogleClients();
+  if (!tokenClient) return;
+
+  try {
+    tokenClient.requestAccessToken({ prompt: '' });
+  } catch (e) {
+    console.warn('[Auth] Silent reconnect failed:', e);
+  }
+}
+
+// Trigger on the first click/touch shortly after load (browsers require a
+// gesture for popup-based flows the very first time)
+['click', 'touchstart'].forEach((evtName) => {
+  document.addEventListener(evtName, attemptSilentConnect, { once: false, passive: true });
+});
 
 // ==========================================================================
 // PWA & Service Worker Manager (Add to Home Screen & Standalone Mode)
