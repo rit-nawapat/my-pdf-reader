@@ -53,6 +53,7 @@ const shelfSection = document.getElementById('shelfSection');
 const recentGrid = document.getElementById('recentGrid');
 const clearRecentsBtn = document.getElementById('clearRecentsBtn');
 const emptyShelf = document.getElementById('emptyShelf');
+const shelfSyncBtn = document.getElementById('shelfSyncBtn');
 const resumeCard = document.getElementById('resumeCard');
 const resumeName = document.getElementById('resumeName');
 const resumeSub = document.getElementById('resumeSub');
@@ -988,6 +989,78 @@ function triggerDriveShelfSync(delayMs = 1500) {
 }
 
 
+
+// ==========================================================================
+// Drive Loading Overlay (visible feedback while pulling a file from Drive)
+// ==========================================================================
+
+const driveLoadingEl = document.getElementById('driveLoading');
+const driveLoadingTitle = document.getElementById('driveLoadingTitle');
+const driveLoadingSub = document.getElementById('driveLoadingSub');
+const driveLoadingCancel = document.getElementById('driveLoadingCancel');
+let driveLoadingAbort = null;
+
+function showDriveLoading(fileName, canCancel = true) {
+  if (!driveLoadingEl) return;
+  if (driveLoadingTitle) {
+    driveLoadingTitle.textContent = fileName
+      ? `กำลังดึง "${fileName}" จาก Google Drive…`
+      : 'กำลังดึงไฟล์จาก Google Drive…';
+  }
+  if (driveLoadingSub) driveLoadingSub.textContent = '';
+  const cancelBtn = driveLoadingEl.querySelector('#driveLoadingCancel');
+  if (cancelBtn) cancelBtn.style.display = canCancel ? 'inline-flex' : 'none';
+  driveLoadingEl.style.display = 'flex';
+}
+
+function hideDriveLoading() {
+  if (driveLoadingEl) driveLoadingEl.style.display = 'none';
+  driveLoadingAbort = null;
+}
+
+function setDriveLoadingProgress(loaded, total) {
+  if (!driveLoadingSub) return;
+  const fmt = (n) => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`;
+  driveLoadingSub.textContent = total
+    ? `${fmt(loaded)} / ${fmt(total)} (${Math.round((loaded / total) * 100)}%)`
+    : `${fmt(loaded)} ดาวน์โหลดแล้ว…`;
+}
+
+async function fetchWithDriveProgress(url, token, fileName) {
+  showDriveLoading(fileName);
+  const resp = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: driveLoadingAbort ? driveLoadingAbort.signal : undefined
+  });
+  if (!resp.ok) return resp;
+  const total = parseInt(resp.headers.get('content-length') || '0', 10);
+  if (!resp.body) {
+    // Older browser: no streaming; fall back to plain blob()
+    return resp;
+  }
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (driveLoadingEl && driveLoadingEl.style.display === 'none') break; // cancelled
+    if (done) break;
+    if (value) {
+      chunks.push(value);
+      loaded += value.length;
+      setDriveLoadingProgress(loaded, total);
+    }
+  }
+  return new Response(new Blob(chunks), { status: resp.status });
+}
+
+if (driveLoadingCancel) {
+  driveLoadingCancel.addEventListener('click', () => {
+    if (driveLoadingAbort) driveLoadingAbort.abort();
+    hideDriveLoading();
+    showToast('ยกเลิกการดึงไฟล์แล้ว');
+  });
+}
 
 // ==========================================================================
 // Sidebar & Tab Control (Drive-Style Drawer)
@@ -2268,6 +2341,40 @@ if (flyoutSidebarBtn) {
 // instead of closing the app.
 let readerHistoryPushed = false;
 
+// Manual "sync now" from the shelf header
+if (shelfSyncBtn) {
+  shelfSyncBtn.addEventListener('click', async () => {
+    const session = getSession();
+    if (!session || !session.token) {
+      showToast('ต้องเข้าสู่ระบบก่อนจึงจะซิงค์กับ Drive ได้');
+      return;
+    }
+    shelfSyncBtn.textContent = 'กำลังซิงค์…';
+    shelfSyncBtn.disabled = true;
+    try {
+      await syncDriveShelf();
+      if (!getRecentFiles().some((i) => i.fromCloudSync)) {
+        showToast('คลังหนังสืออัปเดตแล้ว (ไม่พบเล่มใหม่)');
+      }
+    } finally {
+      shelfSyncBtn.textContent = 'ซิงค์ตอนนี้';
+      shelfSyncBtn.disabled = false;
+    }
+  });
+}
+
+// Auto-pull Drive changes when the user returns to the tab (mobile PWA
+// especially: session persists while backgrounded, so a quick sync re-merge
+// makes the shelf feel live across devices)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (currentPdf || !dropZone || dropZone.style.display === 'none') return; // only on shelf
+  const session = getSession();
+  if (session && session.token) {
+    triggerDriveShelfSync(600);
+  }
+});
+
 function goToShelf(opts = {}) {
   flushReadingState(); // save exact position before leaving the viewer
   clearActiveReader(); // back to shelf intentionally -> no resume prompt
@@ -2766,60 +2873,73 @@ async function pickerCallback(data) {
 
 async function openDriveFileById(fileId, fileName, targetPage = null) {
   try {
-    showToast(`กำลังดึงข้อมูล "${fileName}" จาก Google Drive...`);
-
     if (!gdriveAccessToken) {
       showToast('กำลังขอสิทธิ์เข้าถึงเพื่อเปิดไฟล์...');
       openGoogleDrivePicker();
       return;
     }
 
-    // 1. Fetch file metadata to get cross-device appProperties (lastReadPage)
-    let cloudLastPage = null;
+    const myAbort = new AbortController();
+    driveLoadingAbort = myAbort; // registered only while waiting
+
     try {
-      const metaResp = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,appProperties,size`,
-        {
-          headers: { Authorization: `Bearer ${gdriveAccessToken}` }
+      showDriveLoading(fileName);
+
+      // 1. Fetch file metadata to get cross-device appProperties (lastReadPage)
+      let cloudLastPage = null;
+      try {
+        const metaResp = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,appProperties,size`,
+          {
+            headers: { Authorization: `Bearer ${gdriveAccessToken}` },
+            signal: myAbort.signal
+          }
+        );
+        if (metaResp.ok) {
+          const meta = await metaResp.json();
+          if (meta.appProperties && meta.appProperties.lastReadPage) {
+            cloudLastPage = parseInt(meta.appProperties.lastReadPage, 10);
+          }
         }
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        console.warn('Metadata fetch warning:', e);
+      }
+
+      const pageToResume = targetPage || cloudLastPage;
+
+      // 2. Fetch binary media content with live progress
+      const mediaResp = await fetchWithDriveProgress(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        gdriveAccessToken,
+        fileName
       );
-      if (metaResp.ok) {
-        const meta = await metaResp.json();
-        if (meta.appProperties && meta.appProperties.lastReadPage) {
-          cloudLastPage = parseInt(meta.appProperties.lastReadPage, 10);
+      if (driveLoadingAbort !== myAbort) return; // cancelled -> stop silently
+      hideDriveLoading();
+
+      if (!mediaResp.ok) {
+        if (mediaResp.status === 401) {
+          gdriveAccessToken = null;
+          showToast('เซสชันหมดอายุ กรุณากดเชื่อมต่อใหม่อีกครั้ง');
+          openGoogleDrivePicker();
+          return;
         }
+        throw new Error(`ดาวน์โหลดไฟล์ไม่สำเร็จ (HTTP ${mediaResp.status})`);
       }
-    } catch (e) {
-      console.warn('Metadata fetch warning:', e);
+
+      const blob = await mediaResp.blob();
+      blob.name = fileName;
+      blob.driveFileId = fileId;
+
+      await loadFile(blob, pageToResume);
+    } finally {
+      if (driveLoadingAbort === myAbort) driveLoadingAbort = null;
+      hideDriveLoading();
     }
-
-    const pageToResume = targetPage || cloudLastPage;
-
-    // 2. Fetch binary media content
-    const mediaResp = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      {
-        headers: { Authorization: `Bearer ${gdriveAccessToken}` }
-      }
-    );
-
-    if (!mediaResp.ok) {
-      if (mediaResp.status === 401) {
-        gdriveAccessToken = null;
-        showToast('เซสชันหมดอายุ กรุณากดเชื่อมต่อใหม่อีกครั้ง');
-        openGoogleDrivePicker();
-        return;
-      }
-      throw new Error(`ดาวน์โหลดไฟล์ไม่สำเร็จ (HTTP ${mediaResp.status})`);
-    }
-
-    const blob = await mediaResp.blob();
-    blob.name = fileName;
-    blob.driveFileId = fileId;
-
-    await loadFile(blob, pageToResume);
   } catch (err) {
+    if (err && err.name === 'AbortError') return; // user cancelled
     console.error('Drive file open error:', err);
+    hideDriveLoading();
     showToast('เปิดไฟล์จาก Google Drive ไม่สำเร็จ: ' + err.message);
   }
 }

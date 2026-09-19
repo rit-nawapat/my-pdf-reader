@@ -313,7 +313,10 @@
           <section class="shelf-section" id="shelfSection" aria-label="หนังสือล่าสุด">
             <div class="shelf-header">
               <span class="shelf-subtitle" id="shelfSubtitle">อ่านต่อจากที่ค้างไว้</span>
-              <button class="btn btn-text text-muted" id="clearRecentsBtn" title="ล้างประวัติทั้งหมด">ล้างประวัติ</button>
+              <div class="shelf-header-actions">
+                <button class="btn btn-text text-muted" id="shelfSyncBtn" title="ดึงเล่มล่าสุดจาก Google Drive">ซิงค์ตอนนี้</button>
+                <button class="btn btn-text text-muted" id="clearRecentsBtn" title="ล้างประวัติทั้งหมด">ล้างประวัติ</button>
+              </div>
             </div>
             <div class="recent-grid" id="recentGrid">
               <!-- Dynamically populated -->
@@ -345,6 +348,16 @@
 
   <!-- Toast Notification -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Drive Loading Overlay -->
+  <div class="drive-loading-backdrop" id="driveLoading" style="display: none;" role="status" aria-live="polite">
+    <div class="drive-loading-panel">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="drive-loading-title" id="driveLoadingTitle">กำลังดึงไฟล์จาก Google Drive…</p>
+      <p class="drive-loading-sub" id="driveLoadingSub" aria-hidden="true"></p>
+      <button type="button" class="btn btn-secondary btn-small" id="driveLoadingCancel">ยกเลิก</button>
+    </div>
+  </div>
 
   <!-- Invisible backdrop to catch outside clicks for profile dropdown -->
   <div class="profile-backdrop" id="profileBackdrop" style="display: none;"></div>
