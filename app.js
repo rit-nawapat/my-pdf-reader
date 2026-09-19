@@ -709,6 +709,7 @@ function renderRecentShelf() {
     shelfSection.style.display = 'none';
     if (emptyShelf) emptyShelf.style.display = 'flex';
     renderResumeCard();
+    emptyShelfEnsureSyncButtonVisible();
     return;
   }
 
