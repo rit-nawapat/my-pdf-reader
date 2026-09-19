@@ -716,6 +716,7 @@ function renderRecentShelf() {
   if (emptyShelf) emptyShelf.style.display = 'none';
 
   renderResumeCard();
+  emptyShelfEnsureSyncButtonVisible(); // keep sync reachable even with an empty shelf
 
   recentGrid.innerHTML = '';
   list.forEach((item) => {
@@ -2361,6 +2362,26 @@ if (shelfSyncBtn) {
       shelfSyncBtn.disabled = false;
     }
   });
+}
+
+// The sync button lives inside .shelf-section, which is hidden entirely
+// when the shelf is empty -> inject a standalone button into the empty state.
+function emptyShelfEnsureSyncButtonVisible() {
+  if (!emptyShelf || emptyShelf.style.display === 'none') return;
+  if (document.getElementById('emptyShelfSyncBtn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'emptyShelfSyncBtn';
+  btn.className = 'btn btn-secondary btn-small';
+  btn.textContent = 'ซิงค์ตอนนี้';
+  btn.title = 'ดึงเล่มล่าสุดจาก Google Drive';
+  btn.addEventListener('click', () => {
+    if (shelfSyncBtn) shelfSyncBtn.click();
+  });
+  const hint = document.createElement('p');
+  hint.className = 'empty-sync-hint';
+  hint.textContent = 'หรือกดดึงเล่มที่อ่านไว้จาก Google Drive บนอุปกรณ์อื่น';
+  emptyShelf.appendChild(btn);
+  emptyShelf.appendChild(hint);
 }
 
 // Auto-pull Drive changes when the user returns to the tab (mobile PWA

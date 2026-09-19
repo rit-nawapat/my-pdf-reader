@@ -2735,6 +2735,17 @@ body.theme-light .pwa-guide-box {
   gap: 6px;
 }
 
+/* Sync affordance shown inside the empty-shelf state */
+.empty-shelf {
+  gap: 14px;
+}
+
+.empty-sync-hint {
+  font-size: 12px;
+  color: var(--text-subtle, #6b7280);
+  margin: 0;
+}
+
 .drive-loading-backdrop {
   position: fixed;
   inset: 0;
