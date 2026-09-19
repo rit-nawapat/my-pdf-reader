@@ -863,7 +863,10 @@ let driveShelfSyncTimer = null;
 
 async function syncDriveShelf() {
   const session = getSession();
-  if (!session || !session.token) return; // Only run when logged in
+  if (!session || !session.token) {
+    showToast('ยังไม่ได้เข้าสู่ระบบ Google');
+    return -1;
+  }
 
   const token = session.token;
 
@@ -886,9 +889,12 @@ async function syncDriveShelf() {
         if (resp.status === 401) {
           // Token expired silently - don't disrupt user
           console.info('[DriveSync] Token expired during shelf sync');
+          showToast('เซสชัน Google หมดอายุ ลองกดซิงค์ใหม่หลังเข้าสู่ระบบอีกครั้ง');
+        } else {
+          showToast(`ซิงค์ไม่สำเร็จ (Google Drive HTTP ${resp.status})`);
         }
         driveSyncDoneOnce = true;
-        return;
+        return -1;
       }
 
       const data = await resp.json();
@@ -901,12 +907,13 @@ async function syncDriveShelf() {
 
     if (driveFiles.length === 0) {
       driveSyncDoneOnce = true;
-      return;
+      return 0; // connected fine, just nothing owned by the app yet
     }
 
     // Merge Drive files into local shelf with last-write-wins by read timestamp.
     // Cloud read time lives in appProperties.lastReadAt (modifiedTime is upload
     // time, NOT read time). When local is newer, push it back up to converge.
+    const seenCount = driveFiles.length;
     const currentList = getRecentFiles();
     const existingIds = new Set(currentList.map((item) => item.id));
     let mergedCount = 0;
@@ -968,16 +975,13 @@ async function syncDriveShelf() {
     driveSyncDoneOnce = true;
 
     if (mergedCount > 0) {
-      showToast(`🔄 ซิงค์คลังหนังสือจาก Drive: พบ ${mergedCount} ไฟล์ใหม่จากอุปกรณ์อื่น`);
+      showToast(`🔄 ซิงค์คลังหนังสือจาก Drive: พบ ${mergedCount} เล่มใหม่จากอุปกรณ์อื่น`);
     }
-
-    // If this sync ran right after page load and the user is still on the
-    // shelf, a book read on another device may now be the most recent one.
-    if (Date.now() - bootTime < 10000) {
-      scheduleResumeCountdown();
-    }
+    return seenCount; // for manual-sync status reporting
   } catch (err) {
     console.warn('[DriveSync] Shelf sync failed:', err);
+    showToast('ซิงค์กับ Google Drive ไม่สำเร็จ: ' + (err && err.message ? err.message : 'network error'));
+    return -1;
   }
 }
 
@@ -2350,16 +2354,26 @@ if (shelfSyncBtn) {
       showToast('ต้องเข้าสู่ระบบก่อนจึงจะซิงค์กับ Drive ได้');
       return;
     }
-    shelfSyncBtn.textContent = 'กำลังซิงค์…';
-    shelfSyncBtn.disabled = true;
+    const setBusy = (busy) => {
+      if (shelfSyncBtn) {
+        shelfSyncBtn.textContent = busy ? 'กำลังซิงค์…' : 'ซิงค์ตอนนี้';
+        shelfSyncBtn.disabled = busy;
+      }
+      const alt = document.getElementById('emptyShelfSyncBtn');
+      if (alt) {
+        alt.textContent = busy ? 'กำลังซิงค์…' : 'ซิงค์ตอนนี้';
+        alt.disabled = busy;
+      }
+    };
+    setBusy(true);
     try {
-      await syncDriveShelf();
-      if (!getRecentFiles().some((i) => i.fromCloudSync)) {
-        showToast('คลังหนังสืออัปเดตแล้ว (ไม่พบเล่มใหม่)');
+      const result = await syncDriveShelf();
+      if (typeof result === 'number' && result > 0) {
+        const merged = getRecentFiles().filter((i) => i.fromCloudSync).length;
+        showToast(`ซิงค์แล้ว: พบ ${merged} เล่มจากอุปกรณ์อื่น (รวมอีก ${result} เล่มในระบบ)`);
       }
     } finally {
-      shelfSyncBtn.textContent = 'ซิงค์ตอนนี้';
-      shelfSyncBtn.disabled = false;
+      setBusy(false);
     }
   });
 }
